@@ -35,12 +35,14 @@ abstract class AbstractConfig implements \ArrayAccess, \JsonSerializable
 
 	public function offsetExists(mixed $offset): bool
 	{
+		$offset = \explode('/', $offset, 2);
+		return isset($offset[1], $this->aData[$offset[0]][$offset[1]][0]);
 	}
 
 	public function offsetGet(mixed $offset): mixed
 	{
 		$offset = \explode('/', $offset, 2);
-		$this->Get($offset[0], $offset[1]);
+		return $this->Get($offset[0], $offset[1]);
 	}
 
 	public function offsetSet(mixed $offset, mixed $value): void

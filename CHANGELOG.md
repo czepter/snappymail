@@ -41,6 +41,7 @@
 - Docker: nginx does not listen on IPv6 in IPv4-only environments
 - Search Filters plugin crash on keyword filters
 - PHP 8.4/8.5 deprecations
+- Requests failing with a TypeError when a stale login cookie can't be decrypted after an upgrade
 
 
 ## 2.38.2 – 2024-10-09
