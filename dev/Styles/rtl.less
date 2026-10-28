@@ -90,7 +90,9 @@ html[dir="rtl"] {
 		padding-right: unset;
 
 		.b-folders-system a[data-unread]::after,
-		.b-folders-user a[data-unread]:not(.system)::after {
+		.b-folders-user a[data-unread]:not(.system)::after,
+		.b-account-folders a[data-unread]::after,
+		.b-account-header[data-unread]::after {
 			right: unset;
 			left: 3px;
 		}

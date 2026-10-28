@@ -88,7 +88,12 @@
 		"SENT_NAME": "Gesendet",
 		"DRAFTS_NAME": "Entwürfe",
 		"TRASH_NAME": "Papierkorb",
-		"ARCHIVE_NAME": "Archiv"
+		"ARCHIVE_NAME": "Archiv",
+		"ACCOUNTS": "Konten",
+		"COLLAPSE_ALL": "Alle einklappen",
+		"EXPAND_ALL": "Alle ausklappen",
+		"UNREAD_COUNT": "%COUNT% ungelesen",
+		"FOLDERS_LOAD_ERROR": "Ordner konnten nicht geladen werden. Bitte später erneut versuchen."
 	},
 	"IMAP": {
 		"ACL_RIGHTS": "Rights",

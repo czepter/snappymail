@@ -143,7 +143,9 @@
 	}
 
 	.b-folders-system a[data-unread]::after,
-	.b-folders-user a[data-unread]:not(.system)::after
+	.b-folders-user a[data-unread]:not(.system)::after,
+	.b-account-folders a[data-unread]::after,
+	.b-account-header[data-unread]::after
 	{
 		content: attr(data-unread);
 		background-color: var(--unread-count-bg-color, #999);
@@ -178,6 +180,74 @@
 
 	.b-folders-system {
 		font-weight: bold;
+	}
+
+	/* All accounts in the folder panel */
+	.b-accounts-head {
+		align-items: center;
+		display: flex;
+		font-size: 85%;
+		justify-content: space-between;
+		padding: 4px @folderItemPadding 4px 10px;
+	}
+
+	.b-accounts-title {
+		font-weight: bold;
+		letter-spacing: .05em;
+		text-transform: uppercase;
+	}
+
+	.b-accounts-toggle {
+		color: inherit;
+		text-decoration: underline;
+	}
+
+	.b-account-header {
+		border-left: 3px solid transparent;
+		color: var(--folders-color, #333);
+		display: block;
+		font-weight: bold;
+		line-height: 2.4em;
+		overflow: hidden;
+		padding: 0 2em 0 2px;
+		position: relative;
+		text-decoration: none;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+
+		&:hover {
+			background-color: var(--folders-hover-bg-color, #333);
+			color: var(--folders-hover-color, #eee);
+		}
+
+		.e-collapsed-sign {
+			font-size: 150%;
+			vertical-align: inherit;
+		}
+	}
+
+	.b-account.active > .b-account-header {
+		border-left-color: var(--folders-selected-color, #eee);
+	}
+
+	.b-accounts.multi .b-account {
+		> ul,
+		> .search-input-wrp,
+		> .e-checkbox {
+			margin-left: 1em;
+			width: calc(100% - 1em);
+		}
+		> hr {
+			margin-left: 1.5em;
+		}
+	}
+
+	.b-account-status {
+		color: var(--folders-disabled-color, #666);
+		font-style: italic;
+		line-height: 2.2em;
+		padding: 0 @folderItemPadding;
+		white-space: normal;
 	}
 
 	li li a {
