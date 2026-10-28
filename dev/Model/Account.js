@@ -3,7 +3,7 @@ import { addObservablesTo, addComputablesTo } from 'External/ko';
 import Remote from 'Remote/User/Fetch';
 import { SettingsUserStore } from 'Stores/User/Settings';
 import { AccountUserStore } from 'Stores/User/Account';
-import { FolderUserStore } from 'Stores/User/Folder';
+import { UnifiedUserStore } from 'Stores/User/Unified';
 import { ClientSideKeyNameExpandedAccounts } from 'Common/EnumsUser';
 import { i18n } from 'Common/Translator';
 import { isArray } from 'Common/Utils';
@@ -60,13 +60,18 @@ export class AccountModel extends AbstractModel {
 			isActive: () => AccountUserStore.email() === this.email,
 			// Only show the unread count when the folders are hidden
 			collapsedUnread: () => (!this.expanded()
-				&& (this.isActive() ? FolderUserStore.foldersInboxUnreadCount() : this.unreadEmails())) || null,
+				&& (this.isActive() ? UnifiedUserStore.activeInboxUnread() : this.unreadEmails())) || null,
 			ariaLabel: () => this.collapsedUnread()
 				? this.label() + ', ' + i18n('FOLDER_LIST/UNREAD_COUNT', {COUNT: this.collapsedUnread()})
 				: this.label()
 		});
 
 		this.expanded() && !this.isActive() && setTimeout(() => this.fetchFolders(), 1000);
+
+		// The account switch keeps the page, so show the current folders of the account we leave
+		this.addSubscribables({
+			isActive: active => active || !this.expanded() || this.fetchFolders()
+		});
 
 		// Load at random between 3 and 30 seconds
 		SettingsUserStore.showUnreadCount() && AccountUserStore.email() !== email

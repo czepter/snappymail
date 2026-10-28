@@ -117,6 +117,11 @@ class ServiceActions
 				$this->oActions->IsAdminLoggined();
 			}
 
+			// Request for another account of the user, see Remote/AbstractFetch.js forAccount()
+			if (!empty($_SERVER['HTTP_X_SM_ACCOUNT']) && !($this->oActions instanceof ActionsAdmin)) {
+				$this->oActions->setRequestAccount(\rawurldecode((string) $_SERVER['HTTP_X_SM_ACCOUNT']));
+			}
+
 			$sMethodName = 'Do'.$sAction;
 
 			$this->oActions->logWrite('Action: '.$sMethodName, \LOG_INFO, 'JSON');

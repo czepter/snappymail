@@ -37,6 +37,16 @@ export const MessageUserStore = new class {
 		this.purgeCache = this.purgeCache.throttle(30000);
 	}
 
+	/**
+	 * Remove all cached mail bodies, used when the active account changes
+	 */
+	clearBodies() {
+		[...(this.bodiesDom()?.children || [])].forEach(el => {
+			el.message && (el.message.body = null);
+			el.remove();
+		});
+	}
+
 	purgeCache(all) {
 		const children = this.bodiesDom()?.children || [];
 		let i = Math.max(0, children.length - (all ? 0 : 15));

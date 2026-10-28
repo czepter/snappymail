@@ -201,7 +201,7 @@ export const GnuPGUserStore = new class {
 				}
 				if (null != params.passphrase) {
 					try {
-						const response = await Remote.post('GnupgDecrypt', null, params);
+						const response = await Remote.forAccount(message.account, () => Remote.post('GnupgDecrypt', null, params));
 						if (response?.Result?.data) {
 							return response.Result;
 						}
@@ -227,7 +227,7 @@ export const GnuPGUserStore = new class {
 				data.bodyPart = data.bodyPart.raw;
 				data.sigPart = data.sigPart.body;
 			}
-			let response = await Remote.post('PgpVerifyMessage', null, data);
+			let response = await Remote.forAccount(message.account, () => Remote.post('PgpVerifyMessage', null, data));
 			if (response?.Result) {
 				return {
 					fingerprint: response.Result.fingerprint,

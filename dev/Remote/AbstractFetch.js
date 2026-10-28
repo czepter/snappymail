@@ -3,7 +3,9 @@ import { isArray, pInt, pString } from 'Common/Utils';
 import { serverRequest } from 'Common/Links';
 import { getNotification } from 'Common/Translator';
 
-let iJsonErrorCount = 0;
+let iJsonErrorCount = 0,
+	// Email of the account for the requests started inside forAccount()
+	requestAccount = '';
 
 const getURL = (add = '') => serverRequest('Json') + pString(add),
 
@@ -54,7 +56,10 @@ fetchJSON = (action, sUrl, params, timeout, jsonCallback) => {
 	oRequests[action] = controller;
 	// Currently there is no way to combine multiple signals, so AbortSignal.timeout() not possible
 	controller.timeoutId = timeout && setTimeout(() => abort(action, 'TimeoutError'), timeout);
-	return rl.fetchJSON(sUrl, {signal: signal}, params).then(data => {
+	return rl.fetchJSON(sUrl, {
+		signal: signal,
+		headers: requestAccount ? {'X-SM-Account': encodeURIComponent(requestAccount)} : {}
+	}, params).then(data => {
 		abort(action, 0, 1);
 		return jsonCallback ? jsonCallback(data) : Promise.resolve(data);
 	}).catch(err => {
@@ -74,6 +79,22 @@ class FetchError extends Error
 
 export class AbstractFetchRemote
 {
+	/**
+	 * The requests started in fn() are handled by the server for the given account
+	 * of the user, instead of the active account. Used by the unified inbox.
+	 * @param {string} email
+	 * @param {Function} fn
+	 */
+	forAccount(email, fn) {
+		const previous = requestAccount;
+		requestAccount = email || '';
+		try {
+			return fn();
+		} finally {
+			requestAccount = previous;
+		}
+	}
+
 	abort(sAction, sReason) {
 		abort(sAction, sReason);
 		return this;

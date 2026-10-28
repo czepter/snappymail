@@ -22,7 +22,7 @@ import { i18n } from 'Common/Translator';
 
 import { dropFilesInFolder } from 'Common/Folders';
 
-import { getFolderFromCacheList } from 'Common/Cache';
+import { getFolderFromCacheList, getFolderInboxName } from 'Common/Cache';
 
 import { AppUserStore } from 'Stores/User/App';
 import { SettingsUserStore } from 'Stores/User/Settings';
@@ -31,6 +31,8 @@ import { LanguageStore } from 'Stores/Language';
 import { MessageUserStore } from 'Stores/User/Message';
 import { MessagelistUserStore } from 'Stores/User/Messagelist';
 import { ThemeStore } from 'Stores/Theme';
+import { AccountUserStore } from 'Stores/User/Account';
+import { UnifiedUserStore } from 'Stores/User/Unified';
 
 import Remote from 'Remote/User/Fetch';
 
@@ -126,7 +128,9 @@ export class MailMessageList extends AbstractViewRight {
 
 		addComputablesTo(this, {
 
-			sortSupported: () => FolderUserStore.hasCapability('SORT') && !MessagelistUserStore.threadUid(),
+			// The unified inbox is always sorted by date
+			sortSupported: () => FolderUserStore.hasCapability('SORT') && !MessagelistUserStore.threadUid()
+				&& !MessagelistUserStore.isUnified(),
 
 			messageListSearchDesc: () => {
 				const value = MessagelistUserStore().search;
@@ -250,7 +254,9 @@ export class MailMessageList extends AbstractViewRight {
 
 		this.selector.on('MiddleClick', message => populateMessageBody(message, true));
 
-		this.selector.on('ItemGetUid', message => (message ? message.folder + '/' + message.uid : ''));
+		this.selector.on('ItemGetUid', message => (message
+			? (message.accountHash ? message.accountHash + '/' : '') + message.folder + '/' + message.uid
+			: ''));
 
 		this.selector.on('canSelect', () => MessagelistUserStore.canSelect());
 
@@ -380,27 +386,27 @@ export class MailMessageList extends AbstractViewRight {
 	 * Download selected messages
 	 */
 	downloadZipCommand() {
-		let hashes = []/*, uids = []*/;
-//		MessagelistUserStore.forEach(message => message.checked() && uids.push(message.uid));
-		MessagelistUserStore.forEach(message => message.checked() && hashes.push(message.requestHash));
-		downloadZip(null, hashes, null, null, MessagelistUserStore().folder);
+		// One zip per account in the unified inbox
+		MessagelistUserStore.forEachAccount(MessagelistUserStore.listChecked(), (email, messages) =>
+			downloadZip(null, messages.map(message => message.requestHash), null, null, messages[0].folder)
+		);
 	}
 
 	/**
 	 * Download attachments of selected messages
 	 */
 	downloadAttachCommand() {
-		let hashes = [];
-		MessagelistUserStore.forEach(message => {
-			if (message.checked()) {
+		MessagelistUserStore.forEachAccount(MessagelistUserStore.listChecked(), (email, messages) => {
+			let hashes = [];
+			messages.forEach(message => {
 				message.attachments.forEach(attachment => {
 					if (!attachment.isLinked() && attachment.download) {
 						hashes.push(attachment.download);
 					}
 				});
-			}
+			});
+			downloadZip(null, hashes);
 		});
-		downloadZip(null, hashes);
 	}
 
 	deleteWithoutMoveCommand() {
@@ -414,7 +420,8 @@ export class MailMessageList extends AbstractViewRight {
 		 * When FolderUserStore.trashFolder is set to "Do not use",
 		 * flag as \Deleted for removal by later EXPUNGE
 		 */
-		if (UNUSED_OPTION_VALUE === FolderUserStore.trashFolder()) {
+		// In the unified inbox the trash folder depends on the account, see moveUnifiedMessages()
+		if (UNUSED_OPTION_VALUE === FolderUserStore.trashFolder() && !MessagelistUserStore.isUnified()) {
 			listAction(
 				FolderUserStore.currentFolderFullName(),
 				MessageSetAction.SetDeleted,
@@ -497,7 +504,19 @@ export class MailMessageList extends AbstractViewRight {
 	listSetAllSeen() {
 		let sFolderFullName = FolderUserStore.currentFolderFullName(),
 			iThreadUid = MessagelistUserStore.endThreadUid();
-		if (sFolderFullName) {
+		if (MessagelistUserStore.isUnified()) {
+			// The INBOX of each account
+			UnifiedUserStore.unreadCount() && AccountUserStore.forEach(account =>
+				Remote.forAccount(account.email, () => Remote.request('MessageSetSeenToAll', null, {
+					folder: 'INBOX',
+					setAction: 1,
+					threadUids: ''
+				}))
+			);
+			MessagelistUserStore.forEach(message => message.flags.push('\\seen'));
+			AccountUserStore.forEach(account => account.isActive() || account.unreadEmails(null));
+			getFolderFromCacheList(getFolderInboxName())?.unreadEmails(0);
+		} else if (sFolderFullName) {
 			let cnt = 0;
 			const uids = [];
 
@@ -645,6 +664,10 @@ export class MailMessageList extends AbstractViewRight {
 		if (Settings.app('allowAppendMessage')) {
 			const dropZone = dom.querySelector('.listDragOver'),
 				validFiles = oEvent => {
+					// The unified inbox has no folder to append to
+					if (MessagelistUserStore.isUnified()) {
+						return false;
+					}
 					for (const item of oEvent.dataTransfer.items) {
 						if ('file' === item.kind && RFC822 === item.type) {
 							return true;

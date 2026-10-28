@@ -67,7 +67,10 @@ const
 		message && MessagelistUserStore.setAction(message.folder, action, [message]);
 	},
 
-	fetchRaw = url => rl.fetch(url).then(response => response.ok && response.text());
+	fetchRaw = url => rl.fetch(url).then(response => response.ok && response.text()),
+
+	// The unified inbox needs the message, the same uid can exist in multiple accounts
+	messageUids = message => Object.assign(new Set([message.uid]), {messages: [message]});
 
 export class MailMessageView extends AbstractViewRight {
 	constructor() {
@@ -96,7 +99,7 @@ export class MailMessageView extends AbstractViewRight {
 					const message = currentMessage();
 					if (message) {
 						currentMessage(null);
-						rl.app.moveMessagesToFolderType(folderType, message.folder, new Set([message.uid]), bDelete);
+						rl.app.moveMessagesToFolderType(folderType, message.folder, messageUids(message), bDelete);
 					}
 				}, this.messageVisible),
 			createCommandSetHelper = action =>
@@ -107,13 +110,14 @@ export class MailMessageView extends AbstractViewRight {
 					 * When FolderUserStore.trashFolder is set to "Do not use",
 					 * flag as \Deleted for removal by later EXPUNGE
 					 */
-					if (UNUSED_OPTION_VALUE === FolderUserStore.trashFolder()) {
+					// In the unified inbox the trash folder depends on the account of the message
+					if (UNUSED_OPTION_VALUE === FolderUserStore.trashFolder() && !currentMessage()?.account) {
 						setAction(MessageSetAction.SetDeleted);
 					} else {
 						const message = currentMessage();
 						if (message) {
 							currentMessage(null);
-							rl.app.moveMessagesToFolderType(FolderType.Trash, message.folder, new Set([message.uid]));
+							rl.app.moveMessagesToFolderType(FolderType.Trash, message.folder, messageUids(message));
 						}
 					}
 				}, this.messageVisible);
@@ -617,16 +621,16 @@ export class MailMessageView extends AbstractViewRight {
 		let oMessage = currentMessage();
 		if (oMessage.readReceipt) {
 			oMessage.flags.push('$mdnsent');
-			Remote.request('SendReadReceiptMessage',
+			Remote.forAccount(oMessage.account, () => Remote.request('SendReadReceiptMessage',
 				iError => iError && oMessage.flags.remove('$mdnsent'),
 				{
 					messageFolder: oMessage.folder,
 					messageUid: oMessage.uid,
 					readReceipt: oMessage.readReceipt,
 					subject: i18n('READ_RECEIPT/SUBJECT', { SUBJECT: oMessage.subject() }),
-					plain: i18n('READ_RECEIPT/BODY', { 'READ-RECEIPT': AccountUserStore.email() })
+					plain: i18n('READ_RECEIPT/BODY', { 'READ-RECEIPT': oMessage.account || AccountUserStore.email() })
 				}
-			);
+			));
 		}
 	}
 

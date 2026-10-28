@@ -8,6 +8,13 @@
 	</div>
 	<div class="b-content" data-bind="i18nUpdate: i18nTrigger">
 		<!-- ko if: multiAccount -->
+		<ul class="b-folders-unified">
+			<li>
+				<a class="b-unified selectable" href="#" data-icon="📥" data-bind="css: {'selected': unified.active}, attr: {'data-unread': unified.unreadCount}">
+					<span data-i18n="FOLDER_LIST/UNIFIED_INBOX"></span>
+				</a>
+			</li>
+		</ul>
 		<div class="b-accounts-head">
 			<span class="b-accounts-title" data-i18n="FOLDER_LIST/ACCOUNTS"></span>
 			<a href="#" class="b-accounts-toggle" data-bind="click: toggleAllAccounts, text: toggleAllAccountsLabel"></a>

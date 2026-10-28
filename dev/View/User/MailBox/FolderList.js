@@ -4,7 +4,8 @@ import { ScopeFolderList, ScopeMessageList } from 'Common/Enums';
 import { addShortcut, leftPanelDisabled, stopEvent } from 'Common/Globals';
 import { mailBox, settings } from 'Common/Links';
 import { b64EncodeJSONSafe } from 'Common/Utils';
-import { i18n, getNotification } from 'Common/Translator';
+import { i18n } from 'Common/Translator';
+import { switchAccount } from 'Common/AccountSwitch';
 //import { setFolderETag } from 'Common/Cache';
 import { addComputablesTo } from 'External/ko';
 
@@ -14,8 +15,7 @@ import { FolderUserStore } from 'Stores/User/Folder';
 import { MessageUserStore } from 'Stores/User/Message';
 import { MessagelistUserStore } from 'Stores/User/Messagelist';
 import { AccountUserStore } from 'Stores/User/Account';
-
-import Remote from 'Remote/User/Fetch';
+import { UnifiedUserStore, UNIFIED_HASH } from 'Stores/User/Unified';
 
 import { showScreenPopup } from 'Knoin/Knoin';
 import { AbstractViewLeft } from 'Knoin/AbstractViews';
@@ -55,6 +55,8 @@ export class MailFolderList extends AbstractViewLeft {
 
 		this.filterUnseen = ko.observable(false);
 
+		this.unified = UnifiedUserStore;
+
 		addComputablesTo(this, {
 			foldersFilterVisible: () => 20 < FolderUserStore.folderList().CountRec,
 
@@ -87,20 +89,18 @@ export class MailFolderList extends AbstractViewLeft {
 	 * Switch to another account and open the given folder
 	 */
 	openAccountFolder(account, fullName) {
-		if (AccountUserStore.loading()) {
-			return;
+		switchAccount(account.email, {
+			folder: fullName.replace(/[^a-z0-9._-]+/giu, b64EncodeJSONSafe)
+		});
+	}
+
+	unifiedClick() {
+		if (!SettingsUserStore.usePreviewPane()) {
+			MessageUserStore.message(null);
 		}
-		AccountUserStore.loading(true);
-		Remote.request('AccountSwitch', iError => {
-			if (iError) {
-				AccountUserStore.loading(false);
-				alert(getNotification(iError).replace('%EMAIL%', account.email));
-			} else {
-				rl.route.off();
-				hasher.setHash(mailBox(fullName.replace(/[^a-z0-9._-]+/giu, b64EncodeJSONSafe)));
-				setTimeout(() => location.reload(), 100);
-			}
-		}, {Email: account.email});
+		hasher.setHash(mailBox(UNIFIED_HASH));
+		ThemeStore.isMobile() && leftPanelDisabled(true);
+		AppUserStore.focusedState(ScopeMessageList);
 	}
 
 	onBuild(dom) {
@@ -110,7 +110,14 @@ export class MailFolderList extends AbstractViewLeft {
 		this.oContentScrollable = qs('.b-content');
 
 		dom.addEventListener('click', event => {
-			let el = eqs(event, '.b-account-header');
+			let el = eqs(event, '.b-unified');
+			if (el) {
+				stopEvent(event);
+				moveAction() || this.unifiedClick();
+				return;
+			}
+
+			el = eqs(event, '.b-account-header');
 			if (el) {
 				const account = ko.dataFor(el);
 				account?.setExpanded(!account.expanded());

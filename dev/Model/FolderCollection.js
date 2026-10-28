@@ -30,6 +30,7 @@ import { FolderPopupView } from 'View/Popup/Folder';
 import { showScreenPopup } from 'Knoin/Knoin';
 
 import { isAllowedKeyword } from 'Stores/User/Folder';
+import { UNIFIED_HASH } from 'Stores/User/Unified';
 
 const
 //	isPosNumeric = value => null != value && /^[0-9]*$/.test(value.toString()),
@@ -545,3 +546,23 @@ export class FolderModel extends AbstractModel {
 		);
 	}
 }
+
+/**
+ * Not existing folder for the unified inbox, used as FolderUserStore.currentFolder()
+ */
+class UnifiedFolderModel extends FolderModel {
+	get fullNameHash() {
+		return UNIFIED_HASH;
+	}
+}
+
+let unifiedFolder;
+
+export const getUnifiedFolder = () => {
+	if (!unifiedFolder) {
+		unifiedFolder = new UnifiedFolderModel;
+		unifiedFolder.fullName = UNIFIED_HASH;
+		unifiedFolder.selectable(true);
+	}
+	return unifiedFolder;
+};
