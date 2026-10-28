@@ -1,3 +1,48 @@
+## 2.39.0 – 2026-10-28
+
+### Added
+- "All inboxes" and switching accounts without reload
+- Show all accounts collapsible in the folder panel
+- DMARC and SPF indicators in mail view
+  [#1820](https://github.com/the-djmaze/snappymail/issues/1820)
+- Option to store encrypted private key passphrases in the browser
+- Delete OpenPGP keys on the server when they are deleted in the browser
+- Intermediate certificates for S/MIME signing
+- HTTP based SSO plugin for Apache using PHP_AUTH_USER/PHP_AUTH_PW
+- ldap-contacts-suggestions: search several base DNs
+- Admin panel: accept trusted proxy-auth header (X-NC-Admin) on the admin host
+- Catalan localization, completed Czech translation
+- Base32 for handling GnuPG WKD key finder
+
+### Changed
+- Require PHP 8.2
+- Docker: images are only built on published releases, natively for amd64 and arm64,
+  and pushed to the GitHub Container Registry (linux/386 is dropped)
+- Docker: PHP 8.5 has opcache built in, removed the separate installation
+- Squire v2.4.9, Sabre XML v4.1.0, Sabre VObject v5.0.0
+- Improved font-size handling
+  [#1082](https://github.com/the-djmaze/snappymail/issues/1082)
+- More compact view of folder list
+- Speedup avatars and identicons by caching them
+- Automatically add favicon host to CSP if present
+- CSP blocks legacy HTML element types such as object, embed and applet on Raw actions
+- Only allow Proxy for logged in users
+
+### Fixed
+- OIDC and O365 OAuth2 login flows
+- Non-compliant Autocrypt header
+  [#2039](https://github.com/the-djmaze/snappymail/pull/2039)
+- MailSo header folding around encoded words
+- Cp1252 encoding
+- DateTimeHelper::ParseRFC2822DateString integer overflow on 32-bit PHP
+- AddressBook: an empty side no longer wipes the other during sync
+- PdoAddressBook: GetContactByEmail() passed the wrong columns
+- Message list no longer resets to page 1 and clears the search on message.show
+- Docker: nginx does not listen on IPv6 in IPv4-only environments
+- Search Filters plugin crash on keyword filters
+- PHP 8.4/8.5 deprecations
+
+
 ## 2.38.2 – 2024-10-09
 ### Fixed
 - error '$index is not defined' in Settings > Accounts
