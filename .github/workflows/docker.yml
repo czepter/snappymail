@@ -1,12 +1,9 @@
 name: docker
 
 on:
-  push:
-    branches:
-    - master
-    tags:
-    - 'v*'
-  workflow_dispatch:
+  release:
+    types:
+    - published
 
 # This is needed to push to GitHub Container Registry. See https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry
 permissions:
@@ -17,39 +14,123 @@ concurrency:
   group: docker-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  IMAGE: ghcr.io/${{ github.repository }}
+
 jobs:
+  # Each platform is built natively on its own runner and pushed by digest only,
+  # the 'merge' job then combines the digests into one multi-arch manifest.
+  # See: https://docs.docker.com/build/ci/github-actions/multi-platform/#distribute-build-across-multiple-runners
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+        - platform: linux/amd64
+          runner: ubuntu-24.04
+        - platform: linux/arm64
+          runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
+    - name: Prepare
+      run: echo "PLATFORM_PAIR=${PLATFORM//\//-}" >> "$GITHUB_ENV"
+      env:
+        PLATFORM: ${{ matrix.platform }}
+
     - name: Checkout
       uses: actions/checkout@v4
 
-    # This step generates the docker tags
+    - name: Docker meta
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.IMAGE }}
+        labels: |
+          org.opencontainers.image.description=SnappyMail
+          org.opencontainers.image.licenses=AGPLv3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    # Build and test the image before pushing anything
+    - name: Build
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        file: ./.docker/release/Dockerfile
+        platforms: ${{ matrix.platform }}
+        load: true
+        tags: snappymail:test
+        cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+        cache-to: type=gha,scope=${{ env.PLATFORM_PAIR }},mode=max
+
+    - name: Install container-structure-test
+      run: |
+        ARCH=$( dpkg --print-architecture )
+        curl -fsSL -o "$RUNNER_TEMP/container-structure-test" "https://github.com/GoogleContainerTools/container-structure-test/releases/download/${CST_VERSION}/container-structure-test-linux-${ARCH}"
+        chmod +x "$RUNNER_TEMP/container-structure-test"
+        echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      env:
+        CST_VERSION: v1.19.3
+
+    - name: Test
+      run: .docker/release/test/test.sh snappymail:test
+
+    - name: Push by digest
+      id: build
+      uses: docker/build-push-action@v6
+      with:
+        context: '.'
+        file: ./.docker/release/Dockerfile
+        platforms: ${{ matrix.platform }}
+        labels: ${{ steps.meta.outputs.labels }}
+        outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+        cache-from: type=gha,scope=${{ env.PLATFORM_PAIR }}
+
+    - name: Export digest
+      run: |
+        mkdir -p "$RUNNER_TEMP/digests"
+        digest="${{ steps.build.outputs.digest }}"
+        touch "$RUNNER_TEMP/digests/${digest#sha256:}"
+
+    - name: Upload digest
+      uses: actions/upload-artifact@v4
+      with:
+        name: digests-${{ env.PLATFORM_PAIR }}
+        path: ${{ runner.temp }}/digests/*
+        if-no-files-found: error
+        retention-days: 1
+
+  merge:
+    runs-on: ubuntu-24.04
+    needs: build
+    steps:
+    - name: Download digests
+      uses: actions/download-artifact@v4
+      with:
+        path: ${{ runner.temp }}/digests
+        pattern: digests-*
+        merge-multiple: true
+
+    # This step generates the docker tags. E.g. release 'v2.1.0' -> '2.1.0', '2.1', 'latest'
     - name: Docker meta
       id: meta
       uses: docker/metadata-action@v5
       with:
         # Docker Hub is only used when the repository variable DOCKERHUB_IMAGE is set (e.g. 'user/snappymail')
         images: |
-          ghcr.io/${{ github.repository }}
+          ${{ env.IMAGE }}
           ${{ vars.DOCKERHUB_IMAGE }}
-        # type=ref,event=branch generates tag(s) on branch only. E.g. 'master'
-        # type=raw,value=latest generates 'latest' on the default branch only
-        # type=semver generates tag(s) on tags only. E.g. 'v2.1.0' -> '2.1.0', '2.1'
-        # type=sha generates e.g. 'sha-abc0123'
         tags: |
-          type=ref,event=branch
-          type=raw,value=latest,enable={{is_default_branch}}
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
-          type=sha
-        # The rest of the org.opencontainers.image.xxx labels are dynamically generated
-        labels: |
-          org.opencontainers.image.description=SnappyMail
-          org.opencontainers.image.licenses=AGPLv3
-
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
@@ -68,29 +149,12 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    # Build for the runner's architecture first and test it before pushing anything
-    - name: Build
-      uses: docker/build-push-action@v6
-      with:
-        context: '.'
-        file: ./.docker/release/Dockerfile
-        platforms: linux/amd64
-        load: true
-        tags: snappymail:test
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    - name: Create manifest list and push
+      working-directory: ${{ runner.temp }}/digests
+      run: |
+        docker buildx imagetools create \
+          $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+          $(printf "$IMAGE@sha256:%s " *)
 
-    - name: Test
-      run: .docker/release/test/test.sh snappymail:test
-
-    - name: Build and push
-      uses: docker/build-push-action@v6
-      with:
-        context: '.'
-        file: ./.docker/release/Dockerfile
-        platforms: linux/386,linux/amd64,linux/arm64
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
+    - name: Inspect image
+      run: docker buildx imagetools inspect "$IMAGE:${{ steps.meta.outputs.version }}"
