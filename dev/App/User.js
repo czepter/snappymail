@@ -1,7 +1,8 @@
 import 'External/User/ko';
 
 import { SMAudio } from 'Common/Audio';
-import { arrayLength } from 'Common/Utils';
+import { arrayLength, isArray } from 'Common/Utils';
+import { switchAccount } from 'Common/AccountSwitch';
 import { mailToHelper, setLayoutResizer, dropdownsDetectVisibility, loadAccountsAndIdentities } from 'Common/UtilsUser';
 
 import {
@@ -40,6 +41,7 @@ import { MessagelistUserStore } from 'Stores/User/Messagelist';
 import { ThemeStore, initThemes } from 'Stores/Theme';
 import { LanguageStore } from 'Stores/Language';
 import { MessageUserStore } from 'Stores/User/Message';
+import { UnifiedUserStore } from 'Stores/User/Unified';
 
 import Remote from 'Remote/User/Fetch';
 
@@ -99,6 +101,15 @@ export class AppUser extends AbstractApp {
 	 * @param {boolean=} bDelete = false
 	 */
 	moveMessagesToFolderType(iFolderType, sFromFolderFullName, oUids, bDelete) {
+		// Unified inbox, each account has its own folders
+		if (oUids.messages?.some(message => message.account)) {
+			const fMove = () => MessagelistUserStore.moveUnifiedMessages(oUids.messages, iFolderType, bDelete);
+			bDelete
+				? showScreenPopup(AskPopupView, [i18n('POPUPS_ASK/DESC_WANT_DELETE_MESSAGES'), fMove])
+				: fMove();
+			return;
+		}
+
 		let oMoveFolder = null,
 			nSetSystemFoldersNotification = 0;
 
@@ -198,7 +209,7 @@ export class AppUser extends AbstractApp {
 
 						setTimeout(() => {
 							const cF = FolderUserStore.currentFolderFullName();
-							getFolderInboxName() === cF || folderInformation(cF);
+							getFolderInboxName() === cF || UnifiedUserStore.active() || folderInformation(cF);
 							FolderUserStore.hasCapability('LIST-STATUS') || folderInformationMultiply(true);
 						}, 1000);
 
@@ -245,7 +256,13 @@ export class AppUser extends AbstractApp {
 		if (1 == arrayLength(msg)) {
 			msg = msg[0];
 		}
-		if (msg) {
+		// Unified inbox: compose with the identities of the account of the message
+		const accounts = new Set((isArray(msg) ? msg : [msg]).map(item => item?.account).filter(v => v));
+		if (1 < accounts.size) {
+			alert(i18n('MESSAGE_LIST/UNIFIED_ONE_ACCOUNT'));
+		} else if (accounts.size && !UnifiedUserStore.isActiveAccount([...accounts][0])) {
+			switchAccount([...accounts][0], {route: false}, () => this.showMessageComposer(params));
+		} else if (msg) {
 			msg.decrypt().then((/*success*/)=>showScreenPopup(ComposePopupView, params));
 		} else {
 			showScreenPopup(ComposePopupView, params);

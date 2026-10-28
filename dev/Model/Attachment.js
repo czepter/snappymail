@@ -31,6 +31,8 @@ export class AttachmentModel extends AbstractModel {
 		this.url = '';
 		this.mimeIndex = '';
 		this.estimatedSize = 0;
+		// Set in the unified inbox, see MessageModel
+		this.accountHash = '';
 
 		addObservablesTo(this, {
 			isInline: false,
@@ -135,7 +137,7 @@ export class AttachmentModel extends AbstractModel {
 			mimeIndex: this.mimeIndex,
 			mimeType: this.mimeType,
 			fileName: this.fileName,
-			accountHash: SettingsGet('accountHash')
+			accountHash: this.accountHash || SettingsGet('accountHash')
 		});
 	}
 

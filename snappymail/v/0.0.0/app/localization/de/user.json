@@ -93,7 +93,8 @@
 		"COLLAPSE_ALL": "Alle einklappen",
 		"EXPAND_ALL": "Alle ausklappen",
 		"UNREAD_COUNT": "%COUNT% ungelesen",
-		"FOLDERS_LOAD_ERROR": "Ordner konnten nicht geladen werden. Bitte später erneut versuchen."
+		"FOLDERS_LOAD_ERROR": "Ordner konnten nicht geladen werden. Bitte später erneut versuchen.",
+		"UNIFIED_INBOX": "Alle Posteingänge"
 	},
 	"IMAP": {
 		"ACL_RIGHTS": "Rights",
@@ -146,7 +147,11 @@
 		"SORT_SUBJECT_ASC": "Betreff A-Z",
 		"SORT_SUBJECT_DESC": "Betreff Z-A",
 		"SORT_FROM_ASC": "Von A-Z",
-		"SORT_FROM_DESC": "Von Z-A"
+		"SORT_FROM_DESC": "Von Z-A",
+		"UNIFIED_ACCOUNT_ERROR": "Der Posteingang von %EMAILS% konnte nicht geladen werden.",
+		"UNIFIED_FOLDER_MISSING": "Für diese Aktion ist in %EMAILS% kein Ordner festgelegt.",
+		"UNIFIED_MOVE_ACTIVE_ONLY": "In „Alle Posteingänge“ lassen sich nur Nachrichten des aktiven Kontos in dessen Ordner verschieben.",
+		"UNIFIED_ONE_ACCOUNT": "Bitte nur Nachrichten eines Kontos auswählen."
 	},
 	"MESSAGE": {
 		"BUTTON_EDIT": "Bearbeiten",

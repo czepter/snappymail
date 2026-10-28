@@ -10,6 +10,7 @@ import { addObservablesTo, addComputablesTo } from 'External/ko';
 
 import { FolderUserStore } from 'Stores/User/Folder';
 import { SettingsUserStore } from 'Stores/User/Settings';
+import { UnifiedUserStore } from 'Stores/User/Unified';
 
 import { FileInfo, RFC822 } from 'Common/File';
 import { AttachmentCollectionModel } from 'Model/AttachmentCollection';
@@ -91,7 +92,7 @@ body > * {
 		const lower = keyword.toLowerCase(),
 			flags = message.flags,
 			isSet = flags.includes(lower);
-		Remote.request('MessageSetKeyword', iError => {
+		Remote.forAccount(message.account, () => Remote.request('MessageSetKeyword', iError => {
 			if (!iError) {
 				isSet ? flags.remove(lower) : flags.push(lower);
 			}
@@ -100,7 +101,7 @@ body > * {
 			uids: message.uid,
 			keyword: keyword,
 			setAction: isSet ? 0 : 1
-		})
+		}));
 	},
 
 	/**
@@ -113,6 +114,15 @@ body > * {
 			unic[email.email] || localEmails.has(email.email) || localEmails.set(email.email, email)
 		);
 
+export const
+	/**
+	 * Message hash in the unified inbox, unique for all accounts
+	 * @param {string} hash
+	 * @param {string} accountHash
+	 * @returns {string}
+	 */
+	unifiedMessageHash = (hash, accountHash) => accountHash ? hash + '-' + accountHash : hash;
+
 export class MessageModel extends AbstractModel {
 	constructor() {
 		super();
@@ -121,6 +131,9 @@ export class MessageModel extends AbstractModel {
 			folder: '',
 			uid: 0,
 			hash: '',
+			// Set in the unified inbox, the account of the message
+			account: '',
+			accountHash: '',
 			from: new EmailCollectionModel,
 			to: new EmailCollectionModel,
 			cc: new EmailCollectionModel,
@@ -263,12 +276,20 @@ export class MessageModel extends AbstractModel {
 			uid: this.uid,
 			mimeType: RFC822,
 			fileName: (this.subject() || 'message') + '-' + this.hash + '.eml',
-			accountHash: SettingsGet('accountHash')
+			accountHash: this.accountHash || SettingsGet('accountHash')
 		});
 	}
 
 	toggleTag(keyword) {
 		toggleTag(this, keyword);
+	}
+
+	/**
+	 * Name of the account in the unified inbox
+	 * @returns {string}
+	 */
+	accountLabel() {
+		return UnifiedUserStore.findAccount(this.account)?.label() || IDN.toUnicode(this.account);
 	}
 
 	spamStatus() {
@@ -297,6 +318,12 @@ export class MessageModel extends AbstractModel {
 	 */
 	revivePropertiesFromJson(json) {
 		if (super.revivePropertiesFromJson(json)) {
+			if (this.accountHash) {
+				// The same folder and uid can exist in multiple accounts
+				this.hash = unifiedMessageHash(json.hash, this.accountHash);
+				this.attachments.forEach(attachment => attachment.accountHash = this.accountHash);
+			}
+
 //			this.foundCIDs = isArray(json.FoundCIDs) ? json.FoundCIDs : [];
 //			this.attachments(AttachmentCollectionModel.reviveFromJson(json.attachments, this.foundCIDs));
 //			this.headers(MimeHeaderCollectionModel.reviveFromJson(json.headers));
@@ -698,7 +725,8 @@ export class MessageModel extends AbstractModel {
 				}
 				params.passphrase = pass?.password;
 			}
-			await Remote.post('SMimeDecryptMessage', null, params).then(response => {
+			await Remote.forAccount(message.account, () => Remote.post('SMimeDecryptMessage', null, params))
+			.then(response => {
 				if (response?.Result?.data) {
 					message.smimeDecrypted(true);
 					MimeToMessage(response.Result.data, message);
@@ -726,7 +754,7 @@ export class MessageModel extends AbstractModel {
 			params.uid = message.uid;
 			params.bodyPart = data.bodyPart?.raw;
 			params.sigPart = data.sigPart?.bodyRaw;
-			Remote.post('SMimeVerifyMessage', null, params).then(response => {
+			Remote.forAccount(message.account, () => Remote.post('SMimeVerifyMessage', null, params)).then(response => {
 				if (response?.Result) {
 					if (response.Result.body) {
 						MimeToMessage(response.Result.body, message);

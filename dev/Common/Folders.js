@@ -6,6 +6,7 @@ import { isArray, arrayLength, pInt } from 'Common/Utils';
 import { SettingsUserStore } from 'Stores/User/Settings';
 import { FolderUserStore } from 'Stores/User/Folder';
 import { MessagelistUserStore } from 'Stores/User/Messagelist';
+import { UnifiedUserStore } from 'Stores/User/Unified';
 
 import Remote from 'Remote/User/Fetch';
 
@@ -22,7 +23,12 @@ setRefreshFoldersInterval = minutes => {
 		const cF = FolderUserStore.currentFolderFullName(),
 			iF = getFolderInboxName();
 		folderInformation(iF);
-		iF === cF || folderInformation(cF);
+		if (UnifiedUserStore.active()) {
+			// Check all accounts for new messages
+			MessagelistUserStore.isLoading() || MessagelistUserStore.reload();
+		} else {
+			iF === cF || folderInformation(cF);
+		}
 		folderInformationMultiply();
 	}, refreshFoldersInterval);
 },

@@ -184,6 +184,112 @@ trait Accounts
 	}
 
 	/**
+	 * Message list of the INBOX of all accounts, newest first
+	 */
+	public function DoUnifiedMessageList(): array
+	{
+		$oMainAccount = $this->getMainAccountFromToken();
+		$iOffset = \max(0, (int) $this->GetActionParam('offset', 0));
+		$iLimit = \min(999, \max(10, (int) $this->GetActionParam('limit', 20)));
+		$sSearch = \trim((string) $this->GetActionParam('search', ''));
+
+		$aEmails = \array_merge([$oMainAccount->Email()], \array_keys($this->GetAccounts($oMainAccount)));
+		$aMessages = [];
+		$aAccounts = [];
+		$iTotal = 0;
+		$bLimited = false;
+
+		foreach ($aEmails as $sEmail) {
+			$aInfo = [
+				'email' => IDN::emailToUtf8($sEmail),
+				'error' => false
+			];
+			try {
+				// Message JSON (raw keys) must contain the hash of this account
+				$oAccount = $this->setRequestAccount($sEmail);
+				$aInfo['hash'] = $oAccount->Hash();
+
+				$oMailClient = new \MailSo\Mail\MailClient;
+				$oMailClient->SetLogger($this->Logger());
+				$this->imapConnect($oAccount, false, $oMailClient->ImapClient());
+
+				$oParams = new \MailSo\Mail\MessageListParams;
+				$oParams->sFolderName = 'INBOX';
+				$oParams->iOffset = 0;
+				// Each account needs enough messages to fill the requested page
+				$oParams->iLimit = $iOffset + $iLimit;
+				$oParams->sSearch = $sSearch;
+				$oParams->bUseSort = true;
+				$oSettingsLocal = $this->SettingsProvider(true)->Load($oAccount);
+				if ($oSettingsLocal instanceof \RainLoop\Settings) {
+					$oParams->bHideDeleted = !empty($oSettingsLocal->GetConf('HideDeleted', 1));
+				}
+
+				$oCollection = $oMailClient->MessageList($oParams);
+				$iTotal += \count($oCollection) < $oParams->iLimit ? \count($oCollection) : $oCollection->totalEmails;
+				$bLimited = $bLimited || $oCollection->Limited;
+				$aInfo['unreadEmails'] = $oCollection->FolderInfo->UNSEEN;
+				$aInfo['folders'] = $this->unifiedSystemFolders($oMailClient->ImapClient(), $oSettingsLocal);
+
+				foreach ($oCollection as $oMessage) {
+					$aMessage = \json_decode(Utils::jsonEncode($oMessage), true);
+					$aMessage['account'] = $aInfo['email'];
+					$aMessage['accountHash'] = $aInfo['hash'];
+					$aMessages[] = $aMessage;
+				}
+				$oMailClient->ImapClient()->Disconnect();
+			} catch (\Throwable $oException) {
+				$this->logException($oException);
+				$aInfo['error'] = true;
+			}
+			$aAccounts[] = $aInfo;
+		}
+		$this->resetRequestAccount();
+
+		\usort($aMessages, function($a, $b) {
+			return $b['dateTimestamp'] <=> $a['dateTimestamp'];
+		});
+
+		return $this->DefaultResponse([
+			'@Object' => 'Collection/MessageCollection',
+			'@Collection' => \array_slice($aMessages, $iOffset, $iLimit),
+			'totalEmails' => $iTotal,
+			'totalThreads' => 0,
+			'threadUid' => 0,
+			'newMessages' => [],
+			'offset' => $iOffset,
+			'limit' => $iLimit,
+			'search' => $sSearch,
+			'sort' => '',
+			'limited' => $bLimited,
+			'folder' => null,
+			'accounts' => $aAccounts
+		]);
+	}
+
+	/**
+	 * Trash, spam and archive folder of an account for the actions in the unified inbox
+	 */
+	private function unifiedSystemFolders(\MailSo\Imap\ImapClient $oImapClient, ?\RainLoop\Settings $oSettingsLocal): array
+	{
+		$aResult = [
+			'trash' => $oSettingsLocal ? (string) $oSettingsLocal->GetConf('TrashFolder', '') : '',
+			'junk' => $oSettingsLocal ? (string) $oSettingsLocal->GetConf('JunkFolder', '') : '',
+			'archive' => $oSettingsLocal ? (string) $oSettingsLocal->GetConf('ArchiveFolder', '') : ''
+		];
+		if (\in_array('', $aResult, true)) {
+			// Not configured yet, use the special-use folders
+			foreach ($oImapClient->FolderList('', '*', false, false) as $oFolder) {
+				$sRole = $oFolder->Role();
+				if (isset($aResult[$sRole]) && '' === $aResult[$sRole]) {
+					$aResult[$sRole] = $oFolder->FullName;
+				}
+			}
+		}
+		return $aResult;
+	}
+
+	/**
 	 * Imports all mail from AdditionalAccount into MainAccount
 	 */
 	public function DoAccountImport(): array
@@ -295,6 +401,10 @@ trait Accounts
 		if ($this->switchAccount(\trim($this->GetActionParam('Email', '')))) {
 			$oAccount = $this->getAccountFromToken();
 			$aResult = $this->getAccountData($oAccount);
+			// Sieve depends on the domain of the account
+			$aResult['Capa'] = $this->Capa(false, $oAccount);
+			// The token depends on the active account, needed to switch without reload
+			$aResult['token'] = Utils::GetCsrfToken();
 //			$this->Plugins()->InitAppData($bAdmin, $aResult, $oAccount);
 			return $this->DefaultResponse($aResult);
 		}

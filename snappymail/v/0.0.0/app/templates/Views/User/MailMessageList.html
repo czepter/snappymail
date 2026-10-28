@@ -154,6 +154,9 @@
 					<div class="flagParent fontastic"></div>
 					<div class="senderParent" data-bind="attr: {title: senderClearEmailsString}, text: senderEmailsString"></div>
 					<div class="subjectParent" data-bind="text: subject"></div>
+					<!-- ko if: account -->
+					<div class="accountParent" data-bind="text: accountLabel(), attr: {title: account}"></div>
+					<!-- /ko -->
 					<div class="threads-len" data-bind="visible: 1 < threadsLen(), text: threadsLenText(), attr: {'data-unseen': threadUnseenLen() || null}"></div>
 					<div class="attachmentParent">
 						<i data-bind="css: attachmentIconClass"></i>
@@ -174,6 +177,9 @@
 					<div class="flagParent fontastic"></div>
 					<div class="senderParent" data-bind="attr: {title: senderClearEmailsString}, text: senderEmailsString"></div>
 					<div class="subjectParent" data-bind="text: subject"></div>
+					<!-- ko if: account -->
+					<div class="accountParent" data-bind="text: accountLabel(), attr: {title: account}"></div>
+					<!-- /ko -->
 					<div class="threads-len" data-bind="visible: 1 < threadsLen(), text: threadsLenText(), attr: {'data-unseen': threadUnseenLen() || null}"></div>
 					<div class="attachmentParent">
 						<i data-bind="css: attachmentIconClass"></i>

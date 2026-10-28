@@ -1,5 +1,5 @@
 import { AbstractCollectionModel } from 'Model/AbstractCollection';
-import { MessageModel } from 'Model/Message';
+import { MessageModel, unifiedMessageHash } from 'Model/Message';
 import { MessageUserStore } from 'Stores/User/Message';
 
 'use strict';
@@ -30,7 +30,7 @@ export class MessageCollectionModel extends AbstractCollectionModel
 		let msg = MessageUserStore.message();
 		return super.reviveFromJson(object, message => {
 			// If message is currently viewed, use that.
-			if (msg && msg.hash === message.hash) {
+			if (msg && msg.hash === unifiedMessageHash(message.hash, message.accountHash)) {
 				msg.revivePropertiesFromJson(message);
 				message = msg;
 			} else {

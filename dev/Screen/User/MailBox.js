@@ -18,6 +18,9 @@ import { MailMessageView } from 'View/User/MailBox/MessageView';
 import { AbstractScreen } from 'Knoin/AbstractScreen';
 
 import { MessageModel } from 'Model/Message';
+import { getUnifiedFolder } from 'Model/FolderCollection';
+import { UNIFIED_HASH } from 'Stores/User/Unified';
+import { mailBox } from 'Common/Links';
 import { populateMessageBody } from 'Common/UtilsUser';
 
 export class MailBoxUserScreen extends AbstractScreen {
@@ -68,8 +71,12 @@ export class MailBoxUserScreen extends AbstractScreen {
 	 */
 	onRoute(folderHash, page, search, messageUid) {
 		// Only works when FolderUserStore.folderList() is loaded
-		const folder = getFolderFromHashMap(folderHash.replace(/~([\d]+)$/, ''));
-		if (folder) {
+		const unified = UNIFIED_HASH === folderHash,
+			folder = unified ? getUnifiedFolder() : getFolderFromHashMap(folderHash.replace(/~([\d]+)$/, ''));
+		if (unified && messageUid) {
+			// A message link needs the account, show the list
+			hasher.replaceHash(mailBox(UNIFIED_HASH, page, search));
+		} else if (folder) {
 			FolderUserStore.currentFolder(folder);
 			MessagelistUserStore.page(1 > page ? 1 : page);
 			MessagelistUserStore.listSearch(search);
@@ -91,6 +98,8 @@ export class MailBoxUserScreen extends AbstractScreen {
 	 */
 	onStart() {
 		super.onStart();
+
+		AccountUserStore.email.subscribe(() => this.updateWindowTitle());
 
 		addEventListener('mailbox.inbox-unread-count', e => {
 			FolderUserStore.foldersInboxUnreadCount(e.detail);

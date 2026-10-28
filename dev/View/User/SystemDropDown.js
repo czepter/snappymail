@@ -14,8 +14,7 @@ import { ContactsPopupView } from 'View/Popup/Contacts';
 
 import { fireEvent, stopEvent, SettingsCapa, registerShortcut } from 'Common/Globals';
 
-import Remote from 'Remote/User/Fetch';
-import { getNotification } from 'Common/Translator';
+import { switchAccount } from 'Common/AccountSwitch';
 //import { koComputable } from 'External/ko';
 import { addObservablesTo } from 'External/ko';
 
@@ -42,6 +41,9 @@ export class SystemDropDownUserView extends AbstractViewRight {
 
 		this.allowContacts = AppUserStore.allowContacts();
 
+		// knockout calls it with the account as this
+		this.accountClick = this.accountClick.bind(this);
+
 		addEventListener('audio.stop', () => this.currentAudio(''));
 		addEventListener('audio.start', e => this.currentAudio(e.detail));
 	}
@@ -53,35 +55,11 @@ export class SystemDropDownUserView extends AbstractViewRight {
 	accountClick(account, event) {
 		let email = account?.email;
 		if (email && 0 === event.button && AccountUserStore.email() != email) {
-			AccountUserStore.loading(true);
 			stopEvent(event);
-			Remote.request('AccountSwitch',
-				(iError/*, oData*/) => {
-					if (iError) {
-						AccountUserStore.loading(false);
-						alert('Account error: ' + getNotification(iError).replace('%EMAIL%', email));
-						if (account.isAdditional()) {
-							showScreenPopup(AccountPopupView, [account]);
-						}
-					} else {
-/*						// Not working yet
-						forEachObjectEntry(oData.Result, (key, value) => rl.settings.set(key, value));
-//						MessageUserStore.message();
-//						MessageUserStore.purgeCache();
-						MessagelistUserStore([]);
-//						FolderUserStore.folderList([]);
-						loadFolders(value => {
-							if (value) {
-//								4. Change to INBOX = reload MessageList
-//								MessagelistUserStore.setMessageList();
-							}
-						});
-						AccountUserStore.loading(false);
-*/
-						rl.route.reload();
-					}
-				}, {Email:email}
-			);
+			this.accountMenu()?.ddBtn.hide();
+			switchAccount(email, {
+				onError: () => account.isAdditional() && showScreenPopup(AccountPopupView, [account])
+			});
 		}
 		return true;
 	}

@@ -9,12 +9,9 @@ trait Raw
 	 */
 	public function RawViewAsPlain() : bool
 	{
-		$oAccount = $this->getAccountFromToken();
 		$sRawKey = $this->GetActionParam('RawKey', '');
 		$aValues = $this->decodeRawKey($sRawKey);
-		if (!empty($aValues['folder']) && !empty($aValues['uid'])
-		 && !empty($aValues['accountHash']) && $aValues['accountHash'] === $oAccount->Hash()
-		) {
+		if (!empty($aValues['folder']) && !empty($aValues['uid']) && $this->rawKeyAccount($aValues)) {
 			$this->verifyCacheByKey($sRawKey);
 			$this->initMailClientConnection();
 			\header('Content-Type: text/plain');
@@ -76,6 +73,25 @@ trait Raw
 		return false;
 	}
 
+	/**
+	 * The account of the raw key, this can be another account of the user
+	 * when the message is shown in the unified inbox
+	 */
+	private function rawKeyAccount(array $aValues) : ?\RainLoop\Model\Account
+	{
+		$oAccount = $this->getAccountFromToken();
+		if (empty($aValues['accountHash'])) {
+			return null;
+		}
+		if ($aValues['accountHash'] !== $oAccount->Hash()) {
+			if (!$this->setRequestAccountByHash((string) $aValues['accountHash'])) {
+				return null;
+			}
+			$oAccount = $this->getAccountFromToken();
+		}
+		return $oAccount;
+	}
+
 	private function clearFileName(string $sFileName, string $sContentType, string $sMimeIndex, int $iMaxLength = 250): string
 	{
 		$sFileName = !\strlen($sFileName) ? \preg_replace('/[^a-zA-Z0-9]/', '.', (empty($sMimeIndex) ? '' : $sMimeIndex . '.') . $sContentType) : $sFileName;
@@ -96,9 +112,9 @@ trait Raw
 	{
 		$sRawKey = (string) $this->GetActionParam('RawKey', '');
 
-		$oAccount = $this->getAccountFromToken();
 		$aValues = $this->decodeRawKey($sRawKey);
-		if (empty($aValues['accountHash']) || $aValues['accountHash'] !== $oAccount->Hash()) {
+		$oAccount = $this->rawKeyAccount($aValues);
+		if (!$oAccount) {
 			return false;
 		}
 

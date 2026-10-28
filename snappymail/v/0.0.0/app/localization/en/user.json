@@ -93,7 +93,8 @@
 		"COLLAPSE_ALL": "Collapse all",
 		"EXPAND_ALL": "Expand all",
 		"UNREAD_COUNT": "%COUNT% unread",
-		"FOLDERS_LOAD_ERROR": "Folders could not be loaded. Try again later."
+		"FOLDERS_LOAD_ERROR": "Folders could not be loaded. Try again later.",
+		"UNIFIED_INBOX": "All inboxes"
 	},
 	"IMAP": {
 		"ACL_RIGHTS": "Rights",
@@ -146,7 +147,11 @@
 		"SORT_SUBJECT_ASC": "Subject A-Z",
 		"SORT_SUBJECT_DESC": "Subject Z-A",
 		"SORT_FROM_ASC": "From A-Z",
-		"SORT_FROM_DESC": "From Z-A"
+		"SORT_FROM_DESC": "From Z-A",
+		"UNIFIED_ACCOUNT_ERROR": "The inbox of %EMAILS% could not be loaded.",
+		"UNIFIED_FOLDER_MISSING": "No folder is set for this action in %EMAILS%.",
+		"UNIFIED_MOVE_ACTIVE_ONLY": "In \"All inboxes\" only messages of the active account can be moved to its folders.",
+		"UNIFIED_ONE_ACCOUNT": "Select messages of one account only."
 	},
 	"MESSAGE": {
 		"BUTTON_EDIT": "Edit",

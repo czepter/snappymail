@@ -2,7 +2,7 @@ import { koComputable, addObservablesTo, addComputablesTo } from 'External/ko';
 
 import { SMAudio } from 'Common/Audio';
 import { Notifications } from 'Common/Enums';
-import { MessageSetAction } from 'Common/EnumsUser';
+import { MessageSetAction, FolderType } from 'Common/EnumsUser';
 import { $htmlCL, fireEvent } from 'Common/Globals';
 import { arrayLength, pString } from 'Common/Utils';
 import { UNUSED_OPTION_VALUE } from 'Common/Consts';
@@ -31,6 +31,7 @@ import { b64EncodeJSONSafe } from 'Common/Utils';
 import { SettingsGet } from 'Common/Globals';
 import { SUB_QUERY_PREFIX } from 'Common/Links';
 import { AppUserStore } from 'Stores/User/App';
+import { UnifiedUserStore, UNIFIED_HASH } from 'Stores/User/Unified';
 
 import { baseCollator } from 'Common/Translator';
 
@@ -70,6 +71,9 @@ addObservablesTo(MessagelistUserStore, {
 // Computed Observables
 
 addComputablesTo(MessagelistUserStore, {
+	// Unified inbox, messages of all accounts
+	isUnified: () => UNIFIED_HASH === MessagelistUserStore().folder,
+
 	isLoading: () => {
 		const value = MessagelistUserStore.loading() | MessagelistUserStore.isIncomplete();
 		$htmlCL.toggle('list-loading', value);
@@ -86,10 +90,12 @@ addComputablesTo(MessagelistUserStore, {
 
 	isTrashFolder: () => FolderUserStore.trashFolder() === MessagelistUserStore().folder,
 
-	archiveAllowed: () => ![UNUSED_OPTION_VALUE, MessagelistUserStore().folder].includes(FolderUserStore.archiveFolder())
-		&& !MessagelistUserStore.isDraftFolder(),
+	// In the unified inbox it depends on the account of each message, see moveUnifiedMessages()
+	archiveAllowed: () => MessagelistUserStore.isUnified()
+		|| (![UNUSED_OPTION_VALUE, MessagelistUserStore().folder].includes(FolderUserStore.archiveFolder())
+		&& !MessagelistUserStore.isDraftFolder()),
 
-	canMarkAsSpam: () => !(UNUSED_OPTION_VALUE === FolderUserStore.spamFolder()
+	canMarkAsSpam: () => MessagelistUserStore.isUnified() || !(UNUSED_OPTION_VALUE === FolderUserStore.spamFolder()
 //		| MessagelistUserStore.isArchiveFolder()
 		| MessagelistUserStore.isSentFolder()
 		| MessagelistUserStore.isDraftFolder()
@@ -114,7 +120,9 @@ addComputablesTo(MessagelistUserStore, {
 
 	listCheckedOrSelectedUidsWithSubMails: () => {
 		let result = new Set;
-		MessagelistUserStore.listCheckedOrSelected().forEach(message => {
+		// Used in the unified inbox, where the same uid can exist in multiple accounts
+		result.messages = MessagelistUserStore.listCheckedOrSelected();
+		result.messages.forEach(message => {
 			result.add(message.uid);
 			result.folder = message.folder;
 			if (1 < message.threadsLen()) {
@@ -182,6 +190,84 @@ MessagelistUserStore.canSelect = () =>
 
 let prevFolderName;
 
+const
+	/**
+	 * Response of the UnifiedMessageList action
+	 */
+	setUnifiedList = (iError, oData) => {
+		let error = '';
+		if (iError) {
+			if ('reload' == oData?.name) {
+				return;
+			}
+			error = getNotification(iError);
+		} else {
+			const result = oData.Result,
+				collection = MessageCollectionModel.reviveFromJson(result);
+			if (collection && UnifiedUserStore.active()) {
+				UnifiedUserStore.setAccounts(result.accounts);
+				collection.folder = UNIFIED_HASH;
+				if (result.accounts?.some(account => account.error)) {
+					error = i18n('MESSAGE_LIST/UNIFIED_ACCOUNT_ERROR', {
+						EMAILS: result.accounts.filter(account => account.error).map(account => account.email).join(', ')
+					});
+				}
+
+				MessagelistUserStore.count(collection.totalEmails);
+				MessagelistUserStore.listSearch(pString(collection.search));
+				MessagelistUserStore.listLimited(!!collection.limited);
+				MessagelistUserStore.page(Math.ceil(collection.offset / SettingsUserStore.messagesPerPage() + 1));
+				MessagelistUserStore.threadUid(0);
+				MessagelistUserStore.endHash(
+					UNIFIED_HASH + '|' + collection.search + '|0|' + MessagelistUserStore.page()
+				);
+				MessagelistUserStore.endThreadUid(0);
+
+				const message = MessageUserStore.message();
+				if (message && !message.accountHash) {
+					MessageUserStore.message(null);
+				}
+
+				disableAutoSelect(true);
+				MessagelistUserStore(collection);
+				MessagelistUserStore.isIncomplete(false);
+			} else if (!collection) {
+				MessagelistUserStore.count(0);
+				MessagelistUserStore([]);
+				error = getNotification(Notifications.CantGetMessageList);
+			}
+		}
+		MessagelistUserStore.loading(false);
+		MessagelistUserStore.error(error);
+	},
+
+	/**
+	 * In the unified inbox messages are from multiple accounts.
+	 * The requests started in fn(email, messages) are for that account.
+	 * @param {Array} messages
+	 * @param {Function} fn
+	 */
+	forEachAccount = (messages, fn) => {
+		const accounts = new Map;
+		messages.forEach(message => {
+			const email = message.account || '';
+			accounts.has(email) || accounts.set(email, []);
+			accounts.get(email).push(message);
+		});
+		accounts.forEach((list, email) => Remote.forAccount(email, () => fn(email, list)));
+	},
+
+	/**
+	 * The folder of the current account to update the counts for
+	 * @param {string} email
+	 * @param {string} name
+	 * @returns {?FolderModel}
+	 */
+	accountFolder = (email, name) =>
+		(!email || UnifiedUserStore.isActiveAccount(email)) ? getFolderFromCacheList(name) : null;
+
+MessagelistUserStore.forEachAccount = forEachAccount;
+
 /**
  * @param {boolean=} bDropPagePosition = false
  * @param {boolean=} bDropCurrentFolderCache = false
@@ -216,6 +302,20 @@ MessagelistUserStore.reload = (bDropPagePosition = false, bDropCurrentFolderCach
 	}
 
 	MessagelistUserStore.loading(true);
+
+	Remote.abort('UnifiedMessageList', 'reload');
+	if (UnifiedUserStore.active()) {
+		Remote.abort('MessageList', 'reload').request('UnifiedMessageList',
+			(iError, oData) => setUnifiedList(iError, oData),
+			{
+				offset: iOffset,
+				limit: SettingsUserStore.messagesPerPage(),
+				search: MessagelistUserStore.listSearch()
+			},
+			60000
+		);
+		return;
+	}
 
 	let sGetAdd = '',
 //		folder = getFolderFromCacheList(folderName.fullName),
@@ -347,13 +447,11 @@ MessagelistUserStore.reload = (bDropPagePosition = false, bDropCurrentFolderCach
 MessagelistUserStore.setAction = (sFolderFullName, iSetAction, messages) => {
 	messages = messages || MessagelistUserStore.listChecked();
 
-	let folder,
-		rootUids = [],
-		length;
+	const changed = [];
 
 	if (iSetAction == MessageSetAction.SetSeen) {
 		messages.forEach(oMessage => {
-			if (oMessage.isUnseen() && rootUids.push(oMessage.uid)) {
+			if (oMessage.isUnseen() && changed.push(oMessage)) {
 				oMessage.flags.push('\\seen');
 				if (oMessage.threads().length > 0 && oMessage.threadUnseen().includes(oMessage.uid)) {
 					oMessage.threadUnseen.remove(oMessage.uid);
@@ -362,7 +460,7 @@ MessagelistUserStore.setAction = (sFolderFullName, iSetAction, messages) => {
 		});
 	} else if (iSetAction == MessageSetAction.UnsetSeen) {
 		messages.forEach(oMessage => {
-			if (!oMessage.isUnseen() && rootUids.push(oMessage.uid)) {
+			if (!oMessage.isUnseen() && changed.push(oMessage)) {
 				oMessage.flags.remove('\\seen');
 				if (oMessage.threads().length > 0 && !oMessage.threadUnseen().includes(oMessage.uid)) {
 					oMessage.threadUnseen.push(oMessage.uid);
@@ -371,36 +469,43 @@ MessagelistUserStore.setAction = (sFolderFullName, iSetAction, messages) => {
 		});
 	} else if (iSetAction == MessageSetAction.SetFlag) {
 		messages.forEach(oMessage =>
-			!oMessage.isFlagged() && rootUids.push(oMessage.uid) && oMessage.flags.push('\\flagged')
+			!oMessage.isFlagged() && changed.push(oMessage) && oMessage.flags.push('\\flagged')
 		);
 	} else if (iSetAction == MessageSetAction.UnsetFlag) {
 		messages.forEach(oMessage =>
-			oMessage.isFlagged() && rootUids.push(oMessage.uid) && oMessage.flags.remove('\\flagged')
+			oMessage.isFlagged() && changed.push(oMessage) && oMessage.flags.remove('\\flagged')
 		);
 	} else if (iSetAction == MessageSetAction.SetDeleted) {
 		messages.forEach(oMessage =>
-			!oMessage.isDeleted() && rootUids.push(oMessage.uid) && oMessage.flags.push('\\deleted')
+			!oMessage.isDeleted() && changed.push(oMessage) && oMessage.flags.push('\\deleted')
 		);
 	} else if (iSetAction == MessageSetAction.UnsetDeleted) {
 		messages.forEach(oMessage =>
-			oMessage.isDeleted() && rootUids.push(oMessage.uid) && oMessage.flags.remove('\\deleted')
+			oMessage.isDeleted() && changed.push(oMessage) && oMessage.flags.remove('\\deleted')
 		);
 	}
-	rootUids = rootUids.validUnique();
-	length = rootUids.length;
 
-	if (sFolderFullName && length) {
+	// In the unified inbox each account has its own INBOX
+	sFolderFullName && forEachAccount(changed, (email, list) => {
+		const
+			folderName = email ? list[0].folder : sFolderFullName,
+			rootUids = list.map(oMessage => oMessage.uid).validUnique();
+		let length = rootUids.length,
+			folder;
 		switch (iSetAction) {
 			case MessageSetAction.SetSeen:
 				length = -length;
 				// fallthrough is intentionally
 			case MessageSetAction.UnsetSeen:
-				folder = getFolderFromCacheList(sFolderFullName);
+				folder = accountFolder(email, folderName);
 				if (folder) {
 					folder.unreadEmails(Math.max(0, folder.unreadEmails() + length));
+				} else {
+					const account = UnifiedUserStore.findAccount(email);
+					account?.unreadEmails(Math.max(0, (account.unreadEmails() || 0) + length) || null);
 				}
 				Remote.request('MessageSetSeen', null, {
-					folder: sFolderFullName,
+					folder: folderName,
 					uids: rootUids.join(','),
 					setAction: iSetAction == MessageSetAction.SetSeen ? 1 : 0
 				});
@@ -409,7 +514,7 @@ MessagelistUserStore.setAction = (sFolderFullName, iSetAction, messages) => {
 			case MessageSetAction.SetFlag:
 			case MessageSetAction.UnsetFlag:
 				Remote.request('MessageSetFlagged', null, {
-					folder: sFolderFullName,
+					folder: folderName,
 					uids: rootUids.join(','),
 					setAction: iSetAction == MessageSetAction.SetFlag ? 1 : 0
 				});
@@ -418,14 +523,14 @@ MessagelistUserStore.setAction = (sFolderFullName, iSetAction, messages) => {
 			case MessageSetAction.SetDeleted:
 			case MessageSetAction.UnsetDeleted:
 				Remote.request('MessageSetDeleted', null, {
-					folder: sFolderFullName,
+					folder: folderName,
 					uids: rootUids.join(','),
 					setAction: iSetAction == MessageSetAction.SetDeleted ? 1 : 0
 				});
 				break;
 			// no default
 		}
-	}
+	});
 };
 
 /**
@@ -437,6 +542,16 @@ MessagelistUserStore.setAction = (sFolderFullName, iSetAction, messages) => {
 MessagelistUserStore.moveMessages = (
 	fromFolderFullName, oUids, toFolderFullName = '', copy = false
 ) => {
+	// Unified inbox: the folders of other accounts are not in the folder list
+	const unified = oUids?.messages?.some(message => message.account);
+	if (unified) {
+		if (oUids.messages.some(message => !UnifiedUserStore.isActiveAccount(message.account))) {
+			alert(i18n('MESSAGE_LIST/UNIFIED_MOVE_ACTIVE_ONLY'));
+			return;
+		}
+		fromFolderFullName = oUids.messages[0].folder;
+	}
+
 	const fromFolder = getFolderFromCacheList(fromFolderFullName);
 
 	if (!fromFolder || !oUids?.size) return;
@@ -449,10 +564,10 @@ MessagelistUserStore.moveMessages = (
 		trashFolder = FolderUserStore.trashFolder(),
 		spamFolder = FolderUserStore.spamFolder(),
 		page = MessagelistUserStore.page(),
-		messages =
+		messages = unified ? oUids.messages : (
 			FolderUserStore.currentFolderFullName() === fromFolderFullName
 				? MessagelistUserStore.filter(item => item && oUids.has(item.uid))
-				: [],
+				: []),
 		moveOrDeleteResponseHelper = (iError, oData) => {
 			if (iError) {
 				setFolderETag(FolderUserStore.currentFolderFullName(), '');
@@ -557,4 +672,98 @@ MessagelistUserStore.moveMessages = (
 			}
 		);
 	}
+};
+
+/**
+ * Move messages of the unified inbox to the trash, spam or archive folder of their account
+ * @param {Array} messages
+ * @param {number} iFolderType FolderType.Trash, FolderType.Junk or FolderType.Archive
+ * @param {boolean=} bDelete Delete without moving to the trash
+ */
+MessagelistUserStore.moveUnifiedMessages = (messages, iFolderType, bDelete) => {
+	const
+		type = {
+			[FolderType.Trash]: 'trash',
+			[FolderType.Junk]: 'junk',
+			[FolderType.Archive]: 'archive'
+		}[iFolderType],
+		missing = [];
+	let pending = 0,
+		removed = 0;
+
+	if (!type && !bDelete) {
+		return;
+	}
+
+	forEachAccount(messages, (email, list) => {
+		const
+			fromFolder = list[0].folder,
+			toFolder = bDelete ? '' : UnifiedUserStore.folder(email, type),
+			uids = list.map(message => message.uid).validUnique().join(','),
+			unseen = list.filter(message => message.isUnseen()).length;
+
+		if (!bDelete && UNUSED_OPTION_VALUE === toFolder) {
+			if (FolderType.Trash === iFolderType) {
+				// Flag as \Deleted for removal by later EXPUNGE, like without trash folder
+				MessagelistUserStore.setAction(fromFolder, MessageSetAction.SetDeleted, list);
+			} else {
+				missing.push(email);
+			}
+			return;
+		}
+		if (!bDelete && !toFolder) {
+			missing.push(email);
+			return;
+		}
+
+		const folder = accountFolder(email, fromFolder);
+		if (folder) {
+			folder.etag = '';
+			folder.totalEmails(Math.max(0, folder.totalEmails() - list.length));
+			folder.unreadEmails(Math.max(0, folder.unreadEmails() - unseen));
+		} else if (unseen) {
+			const account = UnifiedUserStore.findAccount(email);
+			account?.unreadEmails(Math.max(0, (account.unreadEmails() || 0) - unseen) || null);
+		}
+
+		list.forEach(message => {
+			MessageUserStore.message() === message && MessageUserStore.message(null);
+			MessagelistUserStore.remove(message);
+		});
+		removed += list.length;
+
+		++pending;
+		const fCallback = iError => {
+			iError && alert(getNotification(iError));
+			if (!--pending) {
+				MessagelistUserStore.count(Math.max(0, MessagelistUserStore.count() - removed));
+				MessagelistUserStore.page() > MessagelistUserStore.pageCount()
+					&& MessagelistUserStore.page(MessagelistUserStore.pageCount());
+				MessagelistUserStore.reload();
+			}
+		};
+		if (bDelete) {
+			Remote.request('MessageDelete', fCallback, {
+				folder: fromFolder,
+				uids: uids
+			});
+		} else {
+			Remote.request('MessageMove', fCallback, {
+				fromFolder: fromFolder,
+				toFolder: toFolder,
+				uids: uids,
+				markAsRead: FolderType.Archive === iFolderType ? 0 : 1,
+				learning: FolderType.Junk === iFolderType ? 'SPAM' : ''
+			});
+		}
+	});
+
+	if (pending) {
+		disableAutoSelect(true);
+		MessagelistUserStore.isIncomplete(true);
+	}
+
+	missing.length && alert(i18n('MESSAGE_LIST/UNIFIED_FOLDER_MISSING', {
+		EMAILS: missing.map(email => IDN.toUnicode(email)).join(', ')
+	}));
 };

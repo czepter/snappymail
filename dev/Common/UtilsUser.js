@@ -4,6 +4,7 @@ import { doc, createElement, elementById, dropdowns, dropdownVisibility, Setting
 import { plainToHtml } from 'Common/Html';
 import { getNotification } from 'Common/Translator';
 import { EmailCollectionModel } from 'Model/EmailCollection';
+import { unifiedMessageHash } from 'Model/Message';
 import { MessageUserStore } from 'Stores/User/Message';
 import { MessagelistUserStore } from 'Stores/User/Messagelist';
 import { SettingsUserStore } from 'Stores/User/Settings';
@@ -33,21 +34,27 @@ dropdownsDetectVisibility = (() =>
 
 editIdentity = Identity => showScreenPopup(IdentityPopupView, [Identity]),
 
-loadAccountsAndIdentities = () => {
-	AccountUserStore.loading(true);
+/**
+ * @param {boolean=} identitiesOnly Keep the accounts, used after switching the account
+ * @param {Function=} fCallback
+ */
+loadAccountsAndIdentities = (identitiesOnly, fCallback) => {
+	identitiesOnly || AccountUserStore.loading(true);
 	IdentityUserStore.loading(true);
 
 	Remote.request('AccountsAndIdentities', (iError, oData) => {
-		AccountUserStore.loading(false);
+		identitiesOnly || AccountUserStore.loading(false);
 		IdentityUserStore.loading(false);
 
 		if (!iError) {
 			let items = oData.Result.Accounts;
-			AccountUserStore(isArray(items)
-				? items.map(oValue => new AccountModel(oValue.email, oValue.name))
-				: []
-			);
-			AccountUserStore.unshift(new AccountModel(SettingsGet('mainEmail'), '', false));
+			if (!identitiesOnly) {
+				AccountUserStore(isArray(items)
+					? items.map(oValue => new AccountModel(oValue.email, oValue.name))
+					: []
+				);
+				AccountUserStore.unshift(new AccountModel(SettingsGet('mainEmail'), '', false));
+			}
 
 			items = oData.Result.Identities;
 			IdentityUserStore(isArray(items)
@@ -60,6 +67,7 @@ loadAccountsAndIdentities = () => {
 			const main = IdentityUserStore.main();
 			main && !main.exists() && setTimeout(()=>editIdentity(main), 1000);
 		}
+		fCallback?.();
 	});
 },
 
@@ -337,7 +345,8 @@ populateMessageBody = (oMessage, popup) => {
 			viewMessage(oMessage, popup);
 		} else {
 			popup || MessageUserStore.loading(true);
-			Remote.message((iError, oData/*, bCached*/) => {
+			// In the unified inbox the message can be of another account
+			Remote.forAccount(oMessage.account, () => Remote.message((iError, oData/*, bCached*/) => {
 				if (iError) {
 					if (Notifications.RequestAborted !== iError && !popup) {
 						MessageUserStore.message(null);
@@ -347,7 +356,7 @@ populateMessageBody = (oMessage, popup) => {
 					let json = oData?.Result;
 					if (json
 						&& ((
-								oMessage.hash && oMessage.hash === json.hash
+								oMessage.hash && oMessage.hash === unifiedMessageHash(json.hash, oMessage.accountHash)
 							) || (
 								!oMessage.hash
 								&& oMessage.folder === json.folder
@@ -365,7 +374,7 @@ populateMessageBody = (oMessage, popup) => {
 					}
 				}
 				popup || MessageUserStore.loading(false);
-			}, oMessage.folder, oMessage.uid);
+			}, oMessage.folder, oMessage.uid));
 		}
 	}
 };

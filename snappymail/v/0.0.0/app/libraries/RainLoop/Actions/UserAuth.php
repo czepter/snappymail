@@ -319,6 +319,69 @@ trait UserAuth
 		return $this->oMainAuthAccount;
 	}
 
+	/**
+	 * Use another account of the logged in user for this request only,
+	 * the active account (cookie) stays the same.
+	 * Used for the messages of all accounts in the unified inbox.
+	 *
+	 * @throws \RainLoop\Exceptions\ClientException
+	 */
+	public function setRequestAccount(string $sEmail): Account
+	{
+		$oMainAccount = $this->getMainAccountFromToken();
+		$sEmail = \SnappyMail\IDN::emailToAscii(\trim($sEmail));
+		if ($oMainAccount->Email() === $sEmail) {
+			// null = no additional account
+			$this->oAdditionalAuthAccount = null;
+			return $oMainAccount;
+		}
+		$aAccounts = $this->GetAccounts($oMainAccount);
+		if (!\strlen($sEmail) || !isset($aAccounts[$sEmail])) {
+			throw new ClientException(Notifications::AccountDoesNotExist);
+		}
+		$oAccount = AdditionalAccount::NewInstanceFromTokenArray($this, $aAccounts[$sEmail], true);
+		if (!$oAccount) {
+			throw new ClientException(Notifications::AccountDoesNotExist);
+		}
+		$this->oAdditionalAuthAccount = $oAccount;
+		return $oAccount;
+	}
+
+	/**
+	 * Like setRequestAccount() but by Account->Hash(), for raw links
+	 */
+	public function setRequestAccountByHash(string $sHash): bool
+	{
+		$oMainAccount = $this->getMainAccountFromToken(false);
+		if (!$oMainAccount || !\strlen($sHash)) {
+			return false;
+		}
+		if ($oMainAccount->Hash() === $sHash) {
+			$this->oAdditionalAuthAccount = null;
+			return true;
+		}
+		foreach ($this->GetAccounts($oMainAccount) as $aAccount) {
+			try {
+				$oAccount = AdditionalAccount::NewInstanceFromTokenArray($this, $aAccount, false);
+			} catch (\Throwable $e) {
+				$oAccount = null;
+			}
+			if ($oAccount && $oAccount->Hash() === $sHash) {
+				$this->oAdditionalAuthAccount = $oAccount;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Undo setRequestAccount(), the account is read from the cookie again
+	 */
+	public function resetRequestAccount(): void
+	{
+		$this->oAdditionalAuthAccount = false;
+	}
+
 	public function SetMainAuthAccount(MainAccount $oAccount): void
 	{
 		$this->oAdditionalAuthAccount = false;
