@@ -6,29 +6,60 @@
 		</a>
 		<a class="btn buttonContacts fontastic" data-bind="visible: allowContacts, click: contactsClick" data-i18n="[title]GLOBAL/CONTACTS">📇</a>
 	</div>
-	<div class="b-content">
-		<ul class="b-folders-system" data-bind="foreach: systemFolders">
-			<li>
-				<a data-bind="dropmessages: $data,
-					css: { 'selected': selected, 'selectable': selectable, 'anim-action-class': actionBlink, 'is-flagged': isFlagged },
-					attr: { 'data-icon': icon, 'data-unread': unreadCount }">
-					<!-- ko text: localName --><!-- /ko -->
-					<!-- ko if: isInbox -->
-					<span class="flag-icon fontastic"></span>
-					<!-- /ko -->
-				</a>
-			</li>
-		</ul>
-		<hr>
-		<div class="search-input-wrp" data-bind="visible: foldersFilterVisible">
-			<input type="search" id="folderSearchInput" data-bind="textInput: foldersFilter" data-i18n="[placeholder]GLOBAL/SEARCH">
-			<a data-bind="click: clearFolderSearch, visible: foldersFilter">✕</a>
+	<div class="b-content" data-bind="i18nUpdate: i18nTrigger">
+		<!-- ko if: multiAccount -->
+		<div class="b-accounts-head">
+			<span class="b-accounts-title" data-i18n="FOLDER_LIST/ACCOUNTS"></span>
+			<a href="#" class="b-accounts-toggle" data-bind="click: toggleAllAccounts, text: toggleAllAccountsLabel"></a>
 		</div>
-		<div class="e-checkbox" tabindex="0" data-bind="toggle: filterUnseen">
-			<i role="checkbox" class="fontastic" data-bind="text: filterUnseen() ? '☑' : '☐'"></i>
-			<span data-i18n="SEARCH/UNSEEN"></span>
+		<!-- /ko -->
+		<div class="b-accounts" data-bind="css: {'multi': multiAccount}, foreach: accountList">
+		<div class="b-account" data-bind="css: {'expanded': expanded, 'active': isActive}">
+			<!-- ko if: $root.multiAccount -->
+			<a class="b-account-header" href="#" data-bind="attr: {title: email, 'aria-expanded': expanded() ? 'true' : 'false', 'aria-label': ariaLabel, 'data-unread': collapsedUnread}">
+				<i class="e-collapsed-sign" data-bind="css: expanded() ? 'icon-down-mini' : 'icon-right-mini'"></i>
+				<!-- ko text: label() --><!-- /ko -->
+			</a>
+			<!-- /ko -->
+			<!-- ko if: isActive() && expanded() -->
+			<ul class="b-folders-system" data-bind="foreach: $root.systemFolders">
+				<li>
+					<a data-bind="dropmessages: $data,
+						css: { 'selected': selected, 'selectable': selectable, 'anim-action-class': actionBlink, 'is-flagged': isFlagged },
+						attr: { 'data-icon': icon, 'data-unread': unreadCount }">
+						<!-- ko text: localName --><!-- /ko -->
+						<!-- ko if: isInbox -->
+						<span class="flag-icon fontastic"></span>
+						<!-- /ko -->
+					</a>
+				</li>
+			</ul>
+			<hr>
+			<div class="search-input-wrp" data-bind="visible: $root.foldersFilterVisible">
+				<input type="search" id="folderSearchInput" data-bind="textInput: $root.foldersFilter" data-i18n="[placeholder]GLOBAL/SEARCH">
+				<a data-bind="click: $root.clearFolderSearch, visible: $root.foldersFilter">✕</a>
+			</div>
+			<div class="e-checkbox" tabindex="0" data-bind="toggle: $root.filterUnseen">
+				<i role="checkbox" class="fontastic" data-bind="text: $root.filterUnseen() ? '☑' : '☐'"></i>
+				<span data-i18n="SEARCH/UNSEEN"></span>
+			</div>
+			<ul class="b-folders-user" data-bind="css: {unreadOnly: $root.filterUnseen}, template: { name: 'MailFolderListItem', foreach: $root.folderListVisible }"></ul>
+			<!-- /ko -->
+			<!-- ko if: !isActive() && expanded() -->
+			<ul class="b-account-folders">
+				<!-- ko if: foldersLoading -->
+				<li class="b-account-status" data-i18n="GLOBAL/LOADING"></li>
+				<!-- /ko -->
+				<!-- ko if: foldersError -->
+				<li class="b-account-status" data-i18n="FOLDER_LIST/FOLDERS_LOAD_ERROR"></li>
+				<!-- /ko -->
+				<!-- ko foreach: folders -->
+				<li><a class="b-account-folder" href="#" data-bind="css: {'selectable': selectable}, attr: {'data-unread': unreadEmails}, style: {textIndent: depth + 'em'}, text: name"></a></li>
+				<!-- /ko -->
+			</ul>
+			<!-- /ko -->
 		</div>
-		<ul class="b-folders-user" data-bind="css: {unreadOnly: filterUnseen}, template: { name: 'MailFolderListItem', foreach: folderListVisible }"></ul>
+		</div>
 		<div class="move-action-content-wrapper" data-bind="visible: moveAction"></div>
 	</div>
 	<div class="b-footer btn-toolbar">

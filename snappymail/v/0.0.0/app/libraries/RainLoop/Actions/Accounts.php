@@ -134,13 +134,53 @@ trait Accounts
 		return $oImapClient;
 	}
 
+	/**
+	 * Like loadAdditionalAccountImapClient() but also accepts the main account,
+	 * so its folders can be shown while an additional account is active
+	 */
+	protected function loadAnyAccountImapClient(string $sEmail): \MailSo\Imap\ImapClient
+	{
+		$oMainAccount = $this->getMainAccountFromToken();
+		if (IDN::emailToAscii($sEmail) !== $oMainAccount->Email()) {
+			return $this->loadAdditionalAccountImapClient($sEmail);
+		}
+		$oImapClient = new \MailSo\Imap\ImapClient;
+		$oImapClient->SetLogger($this->Logger());
+		$this->imapConnect($oMainAccount, false, $oImapClient);
+		return $oImapClient;
+	}
+
 	public function DoAccountUnread(): array
 	{
-		$oImapClient = $this->loadAdditionalAccountImapClient($this->GetActionParam('email', ''));
+		$oImapClient = $this->loadAnyAccountImapClient($this->GetActionParam('email', ''));
 		$oInfo = $oImapClient->FolderStatus('INBOX');
 		return $this->DefaultResponse([
 			'unreadEmails' => \max(0, $oInfo->UNSEEN)
 		]);
+	}
+
+	/**
+	 * Lightweight folder list of a (not active) account for the folder panel
+	 */
+	public function DoAccountFolders(): array
+	{
+		$oImapClient = $this->loadAnyAccountImapClient($this->GetActionParam('email', ''));
+		$aFolders = [];
+		foreach ($oImapClient->FolderList('', '*', false, true) as $oFolder) {
+			$iUnread = $oFolder->UNSEEN;
+			if (null === $iUnread && $oFolder->IsInbox()) {
+				$iUnread = $oImapClient->FolderStatus($oFolder->FullName)->UNSEEN;
+			}
+			$aFolders[] = [
+				'name' => $oFolder->Name(),
+				'fullName' => $oFolder->FullName,
+				'delimiter' => (string) $oFolder->Delimiter(),
+				'role' => $oFolder->IsInbox() ? 'inbox' : $oFolder->Role(),
+				'selectable' => $oFolder->Selectable(),
+				'unreadEmails' => \max(0, (int) $iUnread)
+			];
+		}
+		return $this->DefaultResponse($aFolders);
 	}
 
 	/**

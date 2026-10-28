@@ -88,7 +88,12 @@
 		"SENT_NAME": "Sent",
 		"DRAFTS_NAME": "Drafts",
 		"TRASH_NAME": "Trash",
-		"ARCHIVE_NAME": "Archive"
+		"ARCHIVE_NAME": "Archive",
+		"ACCOUNTS": "Accounts",
+		"COLLAPSE_ALL": "Collapse all",
+		"EXPAND_ALL": "Expand all",
+		"UNREAD_COUNT": "%COUNT% unread",
+		"FOLDERS_LOAD_ERROR": "Folders could not be loaded. Try again later."
 	},
 	"IMAP": {
 		"ACL_RIGHTS": "Rights",
