@@ -37,6 +37,7 @@ class ProcPipes
 		if (\array_key_exists($number, $this->pipes) && \is_resource($this->pipes[$number])) {
 			return $this->pipes[$number];
 		}
+		return null;
 	}
 
 	public function close(int $number): void
