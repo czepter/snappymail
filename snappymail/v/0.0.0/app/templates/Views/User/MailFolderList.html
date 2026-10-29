@@ -10,8 +10,11 @@
 		<!-- ko if: multiAccount -->
 		<ul class="b-folders-unified">
 			<li>
-				<a class="b-unified selectable" href="#" data-icon="📥" data-bind="css: {'selected': unified.active}, attr: {'data-unread': unified.unreadCount}">
-					<span data-i18n="FOLDER_LIST/UNIFIED_INBOX"></span>
+				<a class="b-unified selectable" href="#" data-icon="📥" data-bind="css: {'selected': unified.active}, attr: {'aria-current': unified.active() ? 'page' : null}">
+					<span class="b-unified-name" data-i18n="FOLDER_LIST/UNIFIED_INBOX"></span>
+					<!-- ko if: unified.unreadCount -->
+					<span class="b-count" data-bind="text: unified.unreadCount"></span>
+					<!-- /ko -->
 				</a>
 			</li>
 		</ul>
@@ -21,11 +24,20 @@
 		</div>
 		<!-- /ko -->
 		<div class="b-accounts" data-bind="css: {'multi': multiAccount}, foreach: accountList">
-		<div class="b-account" data-bind="css: {'expanded': expanded, 'active': isActive}">
+		<div class="b-account" data-bind="css: {'expanded': expanded, 'active': isActive}, style: {'--account-color': $root.multiAccount() ? color() : null}">
 			<!-- ko if: $root.multiAccount -->
-			<a class="b-account-header" href="#" data-bind="attr: {title: email, 'aria-expanded': expanded() ? 'true' : 'false', 'aria-label': ariaLabel, 'data-unread': collapsedUnread}">
+			<a class="b-account-header" href="#" data-bind="attr: {title: email, 'aria-expanded': expanded() ? 'true' : 'false', 'aria-label': ariaLabel}">
 				<i class="e-collapsed-sign" data-bind="css: expanded() ? 'icon-down-mini' : 'icon-right-mini'"></i>
-				<!-- ko text: label() --><!-- /ko -->
+				<span class="b-account-avatar" aria-hidden="true" data-bind="text: initial()"></span>
+				<span class="b-account-name">
+					<span class="b-account-label" data-bind="text: label()"></span>
+					<!-- ko if: emailLine() -->
+					<span class="b-account-email" data-bind="text: emailLine()"></span>
+					<!-- /ko -->
+				</span>
+				<!-- ko if: collapsedUnread -->
+				<span class="b-count" aria-hidden="true" data-bind="text: collapsedUnread"></span>
+				<!-- /ko -->
 			</a>
 			<!-- /ko -->
 			<!-- ko if: isActive() && expanded() -->
@@ -61,12 +73,15 @@
 				<li class="b-account-status" data-i18n="FOLDER_LIST/FOLDERS_LOAD_ERROR"></li>
 				<!-- /ko -->
 				<!-- ko foreach: folders -->
-				<li><a class="b-account-folder" href="#" data-bind="css: {'selectable': selectable}, attr: {'data-unread': unreadEmails}, style: {textIndent: depth + 'em'}, text: name"></a></li>
+				<li><a class="b-account-folder" href="#" data-bind="css: {'selectable': selectable}, attr: {'data-unread': unreadEmails, 'data-icon': icon}, style: {paddingLeft: depth ? (depth * 1.25 + 1.75) + 'em' : null}, text: name"></a></li>
 				<!-- /ko -->
 			</ul>
 			<!-- /ko -->
 		</div>
 		</div>
+		<!-- ko if: multiAccount() && allowAccounts -->
+		<a class="b-accounts-add" href="#" data-icon="✚" data-bind="click: addAccount" data-i18n="TOP_TOOLBAR/BUTTON_ADD_ACCOUNT"></a>
+		<!-- /ko -->
 		<div class="move-action-content-wrapper" data-bind="visible: moveAction"></div>
 	</div>
 	<div class="b-footer btn-toolbar">

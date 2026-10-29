@@ -292,6 +292,14 @@ export class MessageModel extends AbstractModel {
 		return UnifiedUserStore.findAccount(this.account)?.label() || IDN.toUnicode(this.account);
 	}
 
+	/**
+	 * Color of the account in the unified inbox
+	 * @returns {string}
+	 */
+	accountColor() {
+		return UnifiedUserStore.findAccount(this.account)?.color() || '';
+	}
+
 	spamStatus() {
 		let spam = this.spamResult;
 		return spam ? i18n(this.isSpam ? 'GLOBAL/SPAM' : 'GLOBAL/NOT_SPAM') + ': ' + spam : '';

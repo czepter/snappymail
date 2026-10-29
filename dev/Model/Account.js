@@ -20,6 +20,19 @@ const
 		junk: 'GLOBAL/SPAM',
 		trash: 'FOLDER_LIST/TRASH_NAME'
 	},
+	// Glyphs of the snappymail font, same as FolderModel.icon()
+	roleIcons = {
+		inbox: '📥',
+		sent: '📧',
+		drafts: '🗎',
+		junk: '⚠',
+		trash: '🗑',
+		archive: '🗄'
+	},
+
+	// Each account gets its own color, white text on them has at least 4.5:1 contrast
+	accountColors = ['#2F6FB0', '#B4590F', '#6E4FA0', '#2E7D5B', '#A23B5C', '#3B6E8F', '#8A6D1F'],
+
 	rolePos = role => {
 		const i = roleOrder.indexOf(role);
 		return 0 > i ? roleOrder.length : i;
@@ -58,6 +71,13 @@ export class AccountModel extends AbstractModel {
 
 		addComputablesTo(this, {
 			isActive: () => AccountUserStore.email() === this.email,
+			color: () => accountColors[Math.max(0, AccountUserStore().indexOf(this)) % accountColors.length],
+			initial: () => this.label().trim().charAt(0).toUpperCase(),
+			// Second line under the name, when the name is not the email address
+			emailLine: () => {
+				const email = IDN.toUnicode(this.email);
+				return email !== this.label() ? email : '';
+			},
 			// Only show the unread count when the folders are hidden
 			collapsedUnread: () => (!this.expanded()
 				&& (this.isActive() ? UnifiedUserStore.activeInboxUnread() : this.unreadEmails())) || null,
@@ -126,6 +146,7 @@ export class AccountModel extends AbstractModel {
 				name: roleNames[folder.role] && !depth(folder) ? i18n(roleNames[folder.role]) : folder.name,
 				fullName: folder.fullName,
 				role: folder.role,
+				icon: depth(folder) ? null : roleIcons[folder.role] || null,
 				selectable: folder.selectable,
 				unreadEmails: folder.unreadEmails || null,
 				depth: depth(folder)
