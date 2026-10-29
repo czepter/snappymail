@@ -150,6 +150,9 @@
 		<div id="messageItem">
 			<div class="messageItemHeader" data-bind="if: message, i18nUpdate: message">
 				<div data-bind="hidden: showFullInfo">
+					<!-- ko if: message().account -->
+					<span class="messageAccount" data-bind="text: message().accountLabel(), attr: {title: message().account}, style: {'--account-color': message().accountColor()}"></span>
+					<!-- /ko -->
 					<time class="date" data-time-format="FULL" data-bind="visible: 0 < message().dateTimestamp(), time: message().dateTimestamp()"></time>
 					<div class="informationShortWrp">
 						<div class="informationShort" data-bind="visible: message().to.length">

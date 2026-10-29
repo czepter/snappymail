@@ -151,7 +151,8 @@
 		"UNIFIED_ACCOUNT_ERROR": "The inbox of %EMAILS% could not be loaded.",
 		"UNIFIED_FOLDER_MISSING": "No folder is set for this action in %EMAILS%.",
 		"UNIFIED_MOVE_ACTIVE_ONLY": "In \"All inboxes\" only messages of the active account can be moved to its folders.",
-		"UNIFIED_ONE_ACCOUNT": "Select messages of one account only."
+		"UNIFIED_ONE_ACCOUNT": "Select messages of one account only.",
+		"SEARCH_ALL_ACCOUNTS": "Search all accounts"
 	},
 	"MESSAGE": {
 		"BUTTON_EDIT": "Edit",

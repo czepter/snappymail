@@ -170,6 +170,27 @@
 			overflow-y: auto;
 		}
 
+		/* Account of the message in the unified inbox */
+		.messageAccount {
+			float: var(--right, right);
+			font-size: 12px;
+			margin-left: 1em;
+			max-width: 40%;
+			overflow: hidden;
+			text-overflow: ellipsis;
+			white-space: nowrap;
+
+			&::before {
+				background-color: var(--account-color, #999);
+				border-radius: 2px;
+				content: '';
+				display: inline-block;
+				height: 8px;
+				margin-right: 6px;
+				width: 8px;
+			}
+		}
+
 		.informationFull {
 
 			table {

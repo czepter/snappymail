@@ -49,6 +49,13 @@ html:not(.rl-left-panel-disabled) #rl-left {
 	max-width: 350px;
 }
 
+/* Room for the account avatars, names and emails */
+@media screen and (min-width: (@maxMobileWidth + 1)) {
+	html.rl-multi-account:not(.rl-left-panel-disabled) #rl-left {
+		min-width: 248px;
+	}
+}
+
 #top-system-dropdown-id::after,
 #button-add-prop-dropdown-id::after {
 	content: '▼';

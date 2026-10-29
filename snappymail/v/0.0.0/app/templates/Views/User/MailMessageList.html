@@ -121,7 +121,7 @@
 	<div class="second-toolbar thm-message-list-top-toolbar">
 		<i class="checkboxCheckAll fontastic" data-bind="text: checkAll() ? (isIncompleteChecked() ? '▣' : '☑') : '☐'"></i>
 		<div class="search-input-wrp">
-			<input type="search" class="inputSearch" tabindex="-1" placeholder="Search" autocorrect="off" autocapitalize="off" data-i18n="[placeholder]GLOBAL/SEARCH" data-bind="textInput: inputSearch, hasfocus: focusSearch">
+			<input type="search" class="inputSearch" tabindex="-1" placeholder="Search" autocorrect="off" autocapitalize="off" data-bind="textInput: inputSearch, hasfocus: focusSearch, attr: {placeholder: searchPlaceholder}">
 			<a class="closeSearch" data-bind="click: cancelSearch, visible: messageListSearchDesc()">×</a>
 		</div>
 		<a class="btn buttonMoreSearch" data-bind="click: advancedSearchClick">▼</a>
@@ -155,7 +155,7 @@
 					<div class="senderParent" data-bind="attr: {title: senderClearEmailsString}, text: senderEmailsString"></div>
 					<div class="subjectParent" data-bind="text: subject"></div>
 					<!-- ko if: account -->
-					<div class="accountParent" data-bind="text: accountLabel(), attr: {title: account}"></div>
+					<div class="accountParent" data-bind="text: accountLabel(), attr: {title: account}, style: {'--account-color': accountColor()}"></div>
 					<!-- /ko -->
 					<div class="threads-len" data-bind="visible: 1 < threadsLen(), text: threadsLenText(), attr: {'data-unseen': threadUnseenLen() || null}"></div>
 					<div class="attachmentParent">
@@ -178,7 +178,7 @@
 					<div class="senderParent" data-bind="attr: {title: senderClearEmailsString}, text: senderEmailsString"></div>
 					<div class="subjectParent" data-bind="text: subject"></div>
 					<!-- ko if: account -->
-					<div class="accountParent" data-bind="text: accountLabel(), attr: {title: account}"></div>
+					<div class="accountParent" data-bind="text: accountLabel(), attr: {title: account}, style: {'--account-color': accountColor()}"></div>
 					<!-- /ko -->
 					<div class="threads-len" data-bind="visible: 1 < threadsLen(), text: threadsLenText(), attr: {'data-unseen': threadUnseenLen() || null}"></div>
 					<div class="attachmentParent">

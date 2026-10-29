@@ -18,7 +18,7 @@ import { isFullscreen, toggleFullscreen } from 'Common/Fullscreen';
 import { mailBox } from 'Common/Links';
 import { Selector } from 'Common/Selector';
 
-import { i18n } from 'Common/Translator';
+import { i18n, translateTrigger } from 'Common/Translator';
 
 import { dropFilesInFolder } from 'Common/Folders';
 
@@ -131,6 +131,11 @@ export class MailMessageList extends AbstractViewRight {
 			// The unified inbox is always sorted by date
 			sortSupported: () => FolderUserStore.hasCapability('SORT') && !MessagelistUserStore.threadUid()
 				&& !MessagelistUserStore.isUnified(),
+
+			searchPlaceholder: () => {
+				translateTrigger();
+				return i18n(UnifiedUserStore.active() ? 'MESSAGE_LIST/SEARCH_ALL_ACCOUNTS' : 'GLOBAL/SEARCH');
+			},
 
 			messageListSearchDesc: () => {
 				const value = MessagelistUserStore().search;

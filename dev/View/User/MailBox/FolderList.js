@@ -1,7 +1,7 @@
 import ko from 'ko';
 
 import { ScopeFolderList, ScopeMessageList } from 'Common/Enums';
-import { addShortcut, leftPanelDisabled, stopEvent } from 'Common/Globals';
+import { addShortcut, leftPanelDisabled, stopEvent, SettingsCapa, $htmlCL } from 'Common/Globals';
 import { mailBox, settings } from 'Common/Links';
 import { b64EncodeJSONSafe } from 'Common/Utils';
 import { i18n } from 'Common/Translator';
@@ -24,6 +24,7 @@ import { showMessageComposer, moveAction } from 'Common/UtilsUser';
 import { FolderCreatePopupView } from 'View/Popup/FolderCreate';
 import { ContactsPopupView } from 'View/Popup/Contacts';
 import { ComposePopupView } from 'View/Popup/Compose';
+import { AccountPopupView } from 'View/Popup/Account';
 
 import { setExpandedFolder, foldersFilter } from 'Model/FolderCollection';
 import { ThemeStore } from '../../../Stores/Theme';
@@ -57,6 +58,8 @@ export class MailFolderList extends AbstractViewLeft {
 
 		this.unified = UnifiedUserStore;
 
+		this.allowAccounts = SettingsCapa('AdditionalAccounts');
+
 		addComputablesTo(this, {
 			foldersFilterVisible: () => 20 < FolderUserStore.folderList().CountRec,
 
@@ -78,6 +81,11 @@ export class MailFolderList extends AbstractViewLeft {
 				[account.expanded(), account.foldersLoading(), account.foldersError()]
 			)]
 		});
+
+		// Wider default folder panel for the account names and emails
+		const toggleMulti = value => $htmlCL.toggle('rl-multi-account', !!value);
+		toggleMulti(this.multiAccount());
+		this.multiAccount.subscribe(toggleMulti);
 	}
 
 	toggleAllAccounts() {
@@ -92,6 +100,10 @@ export class MailFolderList extends AbstractViewLeft {
 		switchAccount(account.email, {
 			folder: fullName.replace(/[^a-z0-9._-]+/giu, b64EncodeJSONSafe)
 		});
+	}
+
+	addAccount() {
+		showScreenPopup(AccountPopupView);
 	}
 
 	unifiedClick() {

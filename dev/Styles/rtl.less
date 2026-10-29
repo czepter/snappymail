@@ -90,12 +90,27 @@ html[dir="rtl"] {
 		padding-right: unset;
 
 		.b-folders-system a[data-unread]::after,
-		.b-folders-unified a[data-unread]::after,
 		.b-folders-user a[data-unread]:not(.system)::after,
-		.b-account-folders a[data-unread]::after,
-		.b-account-header[data-unread]::after {
+		.b-account-folders a[data-unread]::after {
 			right: unset;
 			left: 3px;
+		}
+		.b-accounts.multi .b-account {
+			> ul,
+			> .search-input-wrp,
+			> .e-checkbox {
+				margin-left: 0;
+				margin-right: 26px;
+			}
+			a[data-unread]::after {
+				left: 6px;
+			}
+			li a {
+				border-right: 0;
+			}
+		}
+		.b-account-header {
+			padding: 4px 2px 4px 10px;
 		}
 		.flag-icon {
 			margin-left: 0;

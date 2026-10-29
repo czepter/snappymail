@@ -282,15 +282,24 @@
 
 	/* Account of the message in the unified inbox */
 	.accountParent {
-		border-radius: var(--border-radius, 5px);
-		background-color: rgba(127,127,127,0.15);
 		flex: 0 1 auto;
 		font-size: 80%;
-		max-width: 25%;
+		font-weight: normal;
+		margin: 0 5px 0 0;
+		max-width: 30%;
 		overflow: hidden;
-		padding: 0 4px;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+
+		&::before {
+			background-color: var(--account-color, #999);
+			border-radius: 2px;
+			content: '';
+			display: inline-block;
+			height: 8px;
+			margin-right: 5px;
+			width: 8px;
+		}
 	}
 
 	.replyFlag, .forwardFlag {

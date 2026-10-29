@@ -151,7 +151,8 @@
 		"UNIFIED_ACCOUNT_ERROR": "Der Posteingang von %EMAILS% konnte nicht geladen werden.",
 		"UNIFIED_FOLDER_MISSING": "Für diese Aktion ist in %EMAILS% kein Ordner festgelegt.",
 		"UNIFIED_MOVE_ACTIVE_ONLY": "In „Alle Posteingänge“ lassen sich nur Nachrichten des aktiven Kontos in dessen Ordner verschieben.",
-		"UNIFIED_ONE_ACCOUNT": "Bitte nur Nachrichten eines Kontos auswählen."
+		"UNIFIED_ONE_ACCOUNT": "Bitte nur Nachrichten eines Kontos auswählen.",
+		"SEARCH_ALL_ACCOUNTS": "In allen Konten suchen"
 	},
 	"MESSAGE": {
 		"BUTTON_EDIT": "Bearbeiten",
